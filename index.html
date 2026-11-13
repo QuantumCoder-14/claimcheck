@@ -96,11 +96,13 @@
   <section class="part">
     <div class="part__num">Part one</div>
     <h2>The address</h2>
-    <p class="hint">Five questions. Each answered plainly, with the reason beside it.</p>
+    <p class="hint">Seven questions. Each answered plainly, with the reason beside it.</p>
     <label for="url">Address</label>
     <input type="text" id="url" spellcheck="false" placeholder="https://example.com/page">
     <div class="samples">
       <button data-sample="typo">a disguised name</button>
+      <button data-sample="homograph">a lookalike alphabet</button>
+      <button data-sample="trojan">a double extension</button>
       <button data-sample="short">a shortened link</button>
       <button data-sample="real">an ordinary link</button>
     </div>
@@ -148,26 +150,27 @@
 
   // <<CORE
   // ---------------------------------------------------------------------------
-  // Design: this asks five questions about a link and answers each one with a
-  // verdict, instead of adding up weights into a single number. The headline is
-  // derived from how many questions failed, and which ones.
+  // ClaimCheck engine, v3.
+  //
+  // Links: seven questions instead of five. The new ones look at what a name
+  // actually renders as (punycode decoded back to Unicode, scripts compared for
+  // mixing) and at the path — because "invoice.pdf.exe" and "/apk/download" are
+  // where a lot of real harm happens.
+  //
+  // Text: each assertion is now tagged with the *kind* of source behind it, and
+  // quotes are checked for whether anyone is actually named as saying them.
   // ---------------------------------------------------------------------------
 
   var PASS = 'pass', WARN = 'warn', FAIL = 'fail';
 
-  // Second-level labels that belong to a country code, so "sbi.co.in" is owned by
-  // "sbi.co.in" and not by "co.in".
   var COUNTRY_SECOND_LEVEL = ['co', 'com', 'net', 'org', 'gov', 'ac', 'edu', 'nic', 'firm', 'gen', 'ind'];
 
-  // Names worth checking for disguise. Chosen for the audience: Indian banking,
-  // payments and government, plus the global services people actually log into.
   var WATCHED_NAMES = ['sbi', 'hdfc', 'hdfcbank', 'icici', 'icicibank', 'axis', 'axisbank', 'kotak',
     'paytm', 'phonepe', 'gpay', 'bhim', 'upi', 'aadhaar', 'irctc', 'incometax', 'epfo', 'nsdl',
     'paypal', 'google', 'gmail', 'microsoft', 'outlook', 'apple', 'icloud', 'amazon', 'flipkart',
     'facebook', 'instagram', 'whatsapp', 'netflix', 'linkedin', 'dropbox', 'steam', 'binance',
     'coinbase', 'metamask', 'chase', 'wellsfargo', 'bankofamerica', 'roblox', 'epicgames'];
 
-  // Domains that own their own name, so a match here is not a disguise.
   var LEGITIMATE_OWNERS = ['sbi.co.in', 'onlinesbi.sbi', 'hdfcbank.com', 'icicibank.com', 'axisbank.com',
     'kotak.com', 'paytm.com', 'phonepe.com', 'google.com', 'gmail.com', 'microsoft.com', 'apple.com',
     'amazon.in', 'amazon.com', 'flipkart.com', 'facebook.com', 'instagram.com', 'whatsapp.com',
@@ -178,34 +181,138 @@
   var SHORTENING_SERVICES = ['bit.ly', 't.co', 'tinyurl.com', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly',
     'rebrand.ly', 'cutt.ly', 'rb.gy', 'tiny.cc', 'shorturl.at', 't.ly', 's.id', 'shorte.st', 'adf.ly'];
 
-  // ---------------------------------------------------------------------------
-  // Name disguise: compare letter-skeletons rather than edit distance.
-  // "paypa1" and "paypal" collapse to the same skeleton; "rnicrosoft" and
-  // "microsoft" do too, because rn reads as m at small sizes. This is a
-  // different technique from counting single-character edits, and it catches
-  // digit and lookalike-letter swaps that edit distance treats as two edits.
-  // ---------------------------------------------------------------------------
+  // Extensions that run code when opened, or that are used to smuggle one.
+  var EXECUTABLE_SUFFIXES = ['exe', 'scr', 'pif', 'com', 'bat', 'cmd', 'msi', 'vbs', 'vbe', 'js',
+    'jse', 'wsf', 'wsh', 'ps1', 'jar', 'apk', 'dll', 'hta', 'cpl', 'reg', 'lnk'];
+
+  // Extensions people expect to be documents or images, used as the visible half
+  // of a double extension: "invoice.pdf.exe".
+  var INNOCUOUS_SUFFIXES = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png',
+    'gif', 'txt', 'csv', 'zip', 'rar', 'mp3', 'mp4'];
+
+  // Words that appear far more often in phishing paths than in ordinary ones.
+  var PRESSURE_WORDS = ['login', 'signin', 'verify', 'verification', 'secure', 'security', 'account',
+    'update', 'confirm', 'unlock', 'recover', 'wallet', 'billing', 'payment', 'kyc', 'refund',
+    'support', 'helpdesk', 'reset'];
+
   var CONFUSABLE_DIGITS = { '0': 'o', '1': 'l', '3': 'e', '5': 's', '4': 'a', '7': 't', '8': 'b', '9': 'g' };
   var CONFUSABLE_PAIRS = [['rn', 'm'], ['vv', 'w'], ['cl', 'd'], ['ii', 'u'], ['l1', 'll']];
+
+  // ---------------------------------------------------------------------------
+  // 1. Punycode decoding (RFC 3492). Browsers will hand you "xn--80ak6aa92e" and
+  //    show the reader "аррӏе". To say anything useful about that, we have to get
+  //    back to the Unicode the reader sees.
+  // ---------------------------------------------------------------------------
+  function punycodeAdapt(delta, numPoints, firstTime) {
+    delta = firstTime ? Math.floor(delta / 700) : delta >> 1;
+    delta += Math.floor(delta / numPoints);
+    var k = 0;
+    while (delta > ((36 - 1) * 26) / 2) {
+      delta = Math.floor(delta / (36 - 1));
+      k += 36;
+    }
+    return Math.floor(k + ((36 - 1 + 1) * delta) / (delta + 38));
+  }
+
+  function punycodeDecode(input) {
+    // RFC 3492 only defines a-z, 0-9 and the delimiter. Anything else is not
+    // punycode and must fail loudly rather than decode to nonsense.
+    if (!/^[a-z0-9-]+$/i.test(String(input || ''))) throw new Error('invalid punycode characters');
+    var base = 36, tMin = 1, tMax = 26, initialBias = 72, initialN = 128;
+    var output = [], n = initialN, bias = initialBias, i = 0;
+    var basicEnd = input.lastIndexOf('-');
+    var index = 0;
+    if (basicEnd > 0) {
+      for (var j = 0; j < basicEnd; j++) output.push(input.charCodeAt(j));
+      index = basicEnd + 1;
+    }
+    while (index < input.length) {
+      var oldi = i, w = 1;
+      for (var k = base; ; k += base) {
+        if (index >= input.length) throw new Error('truncated punycode');
+        var c = input.charCodeAt(index++);
+        var digit = c - 48 < 10 ? c - 22 : (c - 65 < 26 ? c - 65 : (c - 97 < 26 ? c - 97 : base));
+        if (digit >= base) throw new Error('invalid punycode digit');
+        i += digit * w;
+        var t = k <= bias ? tMin : (k >= bias + tMax ? tMax : k - bias);
+        if (digit < t) break;
+        w *= base - t;
+      }
+      var out = output.length + 1;
+      bias = punycodeAdapt(i - oldi, out, oldi === 0);
+      n += Math.floor(i / out);
+      i = i % out;
+      output.splice(i, 0, n);
+      i++;
+    }
+    return String.fromCodePoint.apply(null, output);
+  }
+
+  // Decode a hostname label by label, leaving ASCII labels alone.
+  function decodeHost(host) {
+    return String(host || '').split('.').map(function (label) {
+      if (label.indexOf('xn--') !== 0) return label;
+      try { return punycodeDecode(label.slice(4)); } catch (err) { return label; }
+    }).join('.');
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. Script analysis. A label mixing Latin with Cyrillic or Greek is the tell
+  //    for a homograph attack: "аpple" with a Cyrillic а looks identical.
+  // ---------------------------------------------------------------------------
+  var SCRIPT_RANGES = {
+    latin: /[A-Za-z\u00C0-\u024F]/,
+    cyrillic: /[\u0400-\u04FF]/,
+    greek: /[\u0370-\u03FF]/,
+    arabic: /[\u0600-\u06FF]/,
+    devanagari: /[\u0900-\u097F]/,
+    cjk: /[\u4E00-\u9FFF]/
+  };
+
+  function scriptsIn(text) {
+    return Object.keys(SCRIPT_RANGES).filter(function (script) {
+      return SCRIPT_RANGES[script].test(text);
+    });
+  }
+
+  function hasMixedScripts(label) {
+    var found = scriptsIn(label).filter(function (s) { return s !== 'cjk'; });
+    if (found.indexOf('latin') !== -1 && found.length > 1) return true;
+    // a fully non-Latin label that mixes two non-Latin scripts is also odd
+    return found.length > 1 && found.indexOf('latin') === -1;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Name disguise, by skeleton.
+  // ---------------------------------------------------------------------------
+  // Letters from other alphabets that render as Latin ones. This is the piece
+  // that catches "аррӏе" — a wholly Cyrillic label that reads as "apple".
+  var TRANSLITERATE = {
+    '\u0430': 'a', '\u0435': 'e', '\u043e': 'o', '\u0440': 'p', '\u0441': 'c', '\u0443': 'y',
+    '\u0445': 'x', '\u0456': 'i', '\u0455': 's', '\u0501': 'd', '\u04cf': 'l', '\u04bb': 'h',
+    '\u043a': 'k', '\u043c': 'm', '\u043d': 'h', '\u0442': 't', '\u0432': 'b', '\u0433': 'r',
+    '\u03b1': 'a', '\u03bf': 'o', '\u03c1': 'p', '\u03bd': 'v', '\u03c4': 't', '\u03b9': 'i',
+    '\u03ba': 'k', '\u03b5': 'e', '\u03c5': 'u', '\u03c7': 'x', '\u03b7': 'n'
+  };
+
+  function latinize(text) {
+    return String(text || '').split('').map(function (character) {
+      return TRANSLITERATE[character] || character;
+    }).join('');
+  }
 
   function skeleton(text) {
     var value = String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     value = value.replace(/[01345789]/g, function (digit) { return CONFUSABLE_DIGITS[digit] || digit; });
-    CONFUSABLE_PAIRS.forEach(function (pair) {
-      value = value.split(pair[0]).join(pair[1]);
-    });
-    // collapse doubled letters, so "gooogle" and "google" meet in the middle
+    CONFUSABLE_PAIRS.forEach(function (pair) { value = value.split(pair[0]).join(pair[1]); });
     return value.replace(/(.)\1+/g, '$1');
   }
 
   function looksDisguised(hostCore, watchedName) {
     if (!hostCore || !watchedName) return false;
     if (hostCore === watchedName) return false;
-    var a = skeleton(hostCore);
-    var b = skeleton(watchedName);
+    var a = skeleton(hostCore), b = skeleton(watchedName);
     if (a === b) return true;
-    // A watched name padded with extra words: "paypal-secure", "sbi-kyc-verify".
-    // Compare skeletons here too, or "paypa1-secure" walks straight past the check.
     return a.length > b.length && a.indexOf(b) !== -1;
   }
 
@@ -217,7 +324,79 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Address parsing
+  // 4. Is the label readable, or generated? Real brands are pronounceable. A
+  //    registered-lookalike domain is often a keyboard mash.
+  // ---------------------------------------------------------------------------
+  function letterStats(label) {
+    var letters = String(label || '').toLowerCase().replace(/[^a-z]/g, '');
+    var digits = String(label || '').replace(/[^0-9]/g, '');
+    var vowels = (letters.match(/[aeiou]/g) || []).length;
+    var longestConsonantRun = 0, run = 0;
+    for (var i = 0; i < letters.length; i++) {
+      if ('aeiou'.indexOf(letters.charAt(i)) === -1) { run++; longestConsonantRun = Math.max(longestConsonantRun, run); }
+      else run = 0;
+    }
+    return {
+      length: String(label || '').length,
+      letterCount: letters.length,
+      digitCount: digits.length,
+      vowelRatio: letters.length ? vowels / letters.length : 0,
+      digitRatio: String(label || '').length ? digits.length / String(label || '').length : 0,
+      longestConsonantRun: longestConsonantRun
+    };
+  }
+
+  function looksGenerated(label) {
+    var stats = letterStats(label);
+    var reasons = [];
+    if (stats.letterCount >= 6 && stats.vowelRatio < 0.2) reasons.push('almost no vowels');
+    if (stats.digitRatio > 0.3 && stats.length >= 6) reasons.push('more digits than letters');
+    if (stats.longestConsonantRun >= 5) reasons.push('a run of ' + stats.longestConsonantRun + ' consonants');
+    if (stats.length >= 12 && !/[aeiou]/.test(label)) reasons.push('no vowels at all');
+    return reasons;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5. The path and query, which the earlier version ignored.
+  // ---------------------------------------------------------------------------
+  function pathRisks(url) {
+    var found = [];
+    var path = (url.pathname || '').toLowerCase();
+    var segments = path.split('/').filter(Boolean);
+    var last = segments.length ? segments[segments.length - 1] : '';
+
+    var parts = last.split('.');
+    if (parts.length >= 2) {
+      var finalSuffix = parts[parts.length - 1];
+      var penultimate = parts[parts.length - 2];
+      if (EXECUTABLE_SUFFIXES.indexOf(finalSuffix) !== -1) {
+        if (INNOCUOUS_SUFFIXES.indexOf(penultimate) !== -1) {
+          found.push('a double extension (<code>' + penultimate + '.' + finalSuffix + '</code>), so it reads as a document but runs as a program');
+        } else {
+          found.push('a file that runs code (<code>.' + finalSuffix + '</code>)');
+        }
+      }
+    }
+
+    var pressure = PRESSURE_WORDS.filter(function (word) {
+      return segments.some(function (segment) { return segment.indexOf(word) !== -1; });
+    });
+    if (pressure.length >= 2) found.push('several account-pressure words in the path (' + pressure.slice(0, 3).join(', ') + ')');
+
+    var query = url.search || '';
+    var longValue = query.match(/[?&][^=]+=([A-Za-z0-9+/=_-]{40,})/);
+    if (longValue) found.push('a long opaque value in the query string, which often carries an encoded address or payload');
+
+    var decoded = query;
+    try { decoded = decodeURIComponent(query); } catch (err) { decoded = query; }
+    if (/https?:\/\//.test(decoded) && /[?&](url|redirect|next|target|dest|goto|r|continue)=/i.test(query)) {
+      found.push('an address hidden inside the query string');
+    }
+    return found;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. Address parsing and ownership
   // ---------------------------------------------------------------------------
   function parseAddress(raw) {
     var text = String(raw || '').trim();
@@ -225,11 +404,8 @@
     if (/[\u0000-\u001f]/.test(text)) return { ok: false, reason: 'Contains control characters.' };
     var hadScheme = /^[a-z][a-z0-9+.\-]*:\/\//i.test(text);
     var url;
-    try {
-      url = new URL(hadScheme ? text : 'https://' + text);
-    } catch (err) {
-      return { ok: false, reason: 'Not an address a browser can read.' };
-    }
+    try { url = new URL(hadScheme ? text : 'https://' + text); }
+    catch (err) { return { ok: false, reason: 'Not an address a browser can read.' }; }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       return { ok: false, reason: 'Only http and https addresses are meaningful here.' };
     }
@@ -239,16 +415,15 @@
       bare: host.replace(/^www\./, ''),
       owner: ownerOf(host),
       secure: url.protocol === 'https:',
-      port: url.port
+      port: url.port,
+      rendered: decodeHost(host)
     };
   }
 
   function ownerOf(host) {
     var labels = String(host || '').toLowerCase().split('.');
     if (labels.length <= 2) return labels.join('.');
-    var secondLast = labels[labels.length - 2];
-    var last = labels[labels.length - 1];
-    // co.in, com.au, gov.in and friends: the owner is three labels up
+    var secondLast = labels[labels.length - 2], last = labels[labels.length - 1];
     if (last.length === 2 && COUNTRY_SECOND_LEVEL.indexOf(secondLast) !== -1 && labels.length >= 3) {
       return labels.slice(-3).join('.');
     }
@@ -273,7 +448,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // The five questions
+  // 7. The seven questions
   // ---------------------------------------------------------------------------
   function readLink(raw) {
     var parsed = parseAddress(raw);
@@ -281,171 +456,241 @@
 
     var host = parsed.host, bare = parsed.bare, owner = parsed.owner;
     var core = owner.split('.')[0];
+    var renderedCore = decodeHost(core);
     var checks = [];
 
-    function record(id, question, verdict, answer) {
-      checks.push({ id: id, question: question, verdict: verdict, answer: answer });
+    function record(id, question, verdict, answer) { checks.push({ id: id, question: question, verdict: verdict, answer: answer }); }
+
+    // 1. Name honesty — now checked against what the name renders as, not just
+    //    its ASCII form, and with mixed scripts called out.
+    var legitimate = LEGITIMATE_OWNERS.indexOf(owner) !== -1;
+    var mixed = hasMixedScripts(renderedCore);
+    var latinized = latinize(renderedCore);
+    var imitated = legitimate ? null : (disguiseMatch(core) || disguiseMatch(renderedCore) || disguiseMatch(latinized));
+    // A label written wholly in another alphabet whose Latin reading IS a brand.
+    // Here the rendered name is identical to the brand — that is the attack, so
+    // the "identical names are fine" rule must not apply.
+    var homograph = null;
+    if (!legitimate && latinized !== renderedCore) {
+      var latinSkeleton = skeleton(latinized);
+      for (var w = 0; w < WATCHED_NAMES.length; w++) {
+        if (skeleton(WATCHED_NAMES[w]) === latinSkeleton) { homograph = WATCHED_NAMES[w]; break; }
+      }
     }
 
-    // 1. Who owns it?
-    var legitimate = LEGITIMATE_OWNERS.indexOf(owner) !== -1;
-    var imitated = legitimate ? null : disguiseMatch(core);
-    if (imitated) {
+    if (homograph) {
+      record('name-honest', 'Is the name honest?', FAIL,
+        'The name renders as <code>' + renderedCore + '</code> — written in another alphabet so it looks like <b>' + homograph + '</b>. Same shape, different letters, different owner.');
+    } else if (mixed) {
+      record('name-honest', 'Is the name honest?', FAIL,
+        'The name mixes alphabets. Rendered, <code>' + renderedCore + '</code> is built from more than one script, which is how a letter that looks Latin is actually Cyrillic or Greek.');
+    } else if (imitated) {
       record('name-honest', 'Is the name honest?', FAIL,
         'The owner <code>' + owner + '</code> is dressed up to read as <b>' + imitated + '</b>. A digit or letter swap does not change who controls the domain.');
     } else if (legitimate) {
-      record('name-honest', 'Is the name honest?', PASS,
-        '<code>' + owner + '</code> is the domain that name actually belongs to.');
+      record('name-honest', 'Is the name honest?', PASS, '<code>' + owner + '</code> is the domain that name actually belongs to.');
     } else {
       record('name-honest', 'Is the name honest?', PASS,
-        'Nothing in <code>' + owner + '</code> imitates a name people log into.');
+        'Nothing in <code>' + renderedCore + '</code> imitates a name people log into.');
     }
 
-    // 2. Is the transport encrypted?
-    if (!parsed.secure) {
-      record('transport', 'Is the connection encrypted?', FAIL,
-        'Plain <code>http</code>. Anything typed on the page can be read or changed in transit.');
-    } else {
-      record('transport', 'Is the connection encrypted?', PASS,
-        '<code>https</code>. This says the connection is private, not that the owner is honest.');
-    }
+    // 2. Transport
+    record('transport', 'Is the connection encrypted?', parsed.secure ? PASS : FAIL,
+      parsed.secure
+        ? '<code>https</code>. This says the connection is private, not that the owner is honest.'
+        : 'Plain <code>http</code>. Anything typed on the page can be read or changed in transit.');
 
-    // 3. Does it go where it appears to go?
+    // 3. Direction
     var detours = [];
     if (SHORTENING_SERVICES.indexOf(bare) !== -1) detours.push('a shortening service, so the real destination is hidden');
     if (/[?&](url|redirect|next|target|dest|goto|r|continue)=/i.test(parsed.url.search)) detours.push('a destination carried in the query string');
     if (isNumericHost(host)) detours.push('a raw numeric address rather than a name');
-    if (detours.length) {
-      record('direct', 'Does the address go where it appears to?', FAIL,
-        'It is ' + detours.join(', and ') + '.');
-    } else {
-      record('direct', 'Does the address go where it appears to?', PASS,
-        'The address names its own destination directly.');
-    }
+    record('direct', 'Does the address go where it appears to?', detours.length ? FAIL : PASS,
+      detours.length ? 'It is ' + detours.join(', and ') + '.' : 'The address names its own destination directly.');
 
-    // 4. Is it a real public site?
+    // 4. Publicness
     if (isLocalHost(host)) {
       record('reachable', 'Is it a public site?', FAIL,
         '<code>' + host + '</code> is a private or loopback address. No message should ever send you to one.');
     } else if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
-      record('reachable', 'Is it a public site?', WARN,
-        'Uses port <code>' + parsed.port + '</code>, which ordinary websites do not.');
+      record('reachable', 'Is it a public site?', WARN, 'Uses port <code>' + parsed.port + '</code>, which ordinary websites do not.');
     } else {
       record('reachable', 'Is it a public site?', PASS, 'A normal public address on a standard port.');
     }
 
-    // 5. Is anything disguised in the text of the address?
+    // 5. Readability of the name
+    var generated = looksGenerated(renderedCore);
+    if (generated.length) {
+      record('readable', 'Is the name a word, or a keyboard mash?', WARN,
+        'The name <code>' + renderedCore + '</code> looks machine-made: ' + generated.join(', ') + '. That is what throwaway phishing domains look like.');
+    } else {
+      record('readable', 'Is the name a word, or a keyboard mash?', PASS,
+        '<code>' + renderedCore + '</code> reads like a name someone chose.');
+    }
+
+    // 6. The path
+    var risks = pathRisks(parsed.url);
+    if (risks.length) {
+      record('path', 'Is the path itself dangerous?', risks.some(function (r) { return r.indexOf('runs code') !== -1 || r.indexOf('double extension') !== -1; }) ? FAIL : WARN,
+        'It contains ' + risks.join('; ') + '.');
+    } else {
+      record('path', 'Is the path itself dangerous?', PASS, 'No executable file, no double extension, no encoded address.');
+    }
+
+    // 7. Address cleanliness
     var oddities = [];
-    if (host.indexOf('xn--') === 0 || host.indexOf('.xn--') !== -1) oddities.push('punycode, which can render as a lookalike name');
+    if (host.indexOf('xn--') === 0 || host.indexOf('.xn--') !== -1) {
+      oddities.push('punycode, which renders as <code>' + renderedCore + '</code>');
+    }
     if (parsed.url.username || parsed.url.password) oddities.push('credentials written before the host');
     var encoded = (parsed.url.search.match(/%[0-9a-f]{2}/gi) || []).length;
     if (encoded > 5) oddities.push(encoded + ' percent-encoded sequences');
     if (bare.split('.').length > 4) oddities.push(bare.split('.').length + ' subdomain levels');
     if (parsed.url.href.length > 120) oddities.push('a ' + parsed.url.href.length + '-character address');
-    if (oddities.length) {
-      record('clean', 'Is the address itself clean?', WARN, 'Contains ' + oddities.join(', ') + '.');
-    } else {
-      record('clean', 'Is the address itself clean?', PASS, 'No punycode, no embedded credentials, no padding.');
-    }
+    record('clean', 'Is the address itself clean?', oddities.length ? WARN : PASS,
+      oddities.length ? 'Contains ' + oddities.join(', ') + '.' : 'No punycode, no embedded credentials, no padding.');
 
     var failed = checks.filter(function (c) { return c.verdict === FAIL; });
     var warned = checks.filter(function (c) { return c.verdict === WARN; });
-    var criticalFail = failed.some(function (c) { return c.id === 'name-honest' || c.id === 'reachable'; });
+    var disqualifying = failed.some(function (c) { return c.id === 'name-honest' || c.id === 'reachable' || c.id === 'path'; });
 
     var headline, tone;
-    if (criticalFail || failed.length >= 2) {
-      headline = 'Do not trust this address'; tone = FAIL;
-    } else if (failed.length === 1 || warned.length >= 2) {
-      headline = 'Treat it with suspicion'; tone = WARN;
-    } else if (warned.length === 1) {
-      headline = 'Probably fine, one oddity'; tone = WARN;
-    } else {
-      headline = 'Nothing wrong with the address itself'; tone = PASS;
-    }
+    if (disqualifying || failed.length >= 2) { headline = 'Do not trust this address'; tone = FAIL; }
+    else if (failed.length === 1 || warned.length >= 2) { headline = 'Treat it with suspicion'; tone = WARN; }
+    else if (warned.length === 1) { headline = 'Probably fine, one oddity'; tone = WARN; }
+    else { headline = 'Nothing wrong with the address itself'; tone = PASS; }
 
-    return { ok: true, checks: checks, headline: headline, tone: tone,
-             owner: owner, host: bare, failed: failed.length, warned: warned.length };
+    return { ok: true, checks: checks, headline: headline, tone: tone, owner: owner,
+             rendered: parsed.rendered, host: bare, failed: failed.length, warned: warned.length };
   }
 
   // ---------------------------------------------------------------------------
-  // Claim evidence: for each assertion, name the evidence attached to it.
+  // 8. Text: claim segmentation, source taxonomy, quote attribution
   // ---------------------------------------------------------------------------
+  var ABBREVIATIONS = ['mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'eg', 'ie',
+    'no', 'fig', 'approx', 'inc', 'ltd', 'govt', 'rs'];
+
   var ASSERTION_MARKERS = /\b(is|are|was|were|has|have|had|will|would|can|could|must|shows?|proves?|confirms?|reveals?|causes?|caused|leads?|reduces?|increases?|bans?|banned|announced|approved|launched|recorded|reported|died|killed|won|lost|reached|contains?|requires?|allows?|treats?|cures?)\b/i;
 
-  var SOURCE_MARKERS = /\b(according to|as reported by|said in a statement|told (reporters|the court|the paper)|spokesperson|press release|white paper|peer[- ]reviewed|published in|the (ministry|department|court|commission|authority|bureau|board) of|the government of)\b/i;
-  var DOCUMENT_MARKERS = /(https?:\/\/\S+|\b(doc|document|report|circular|notification|order|gazette|filing|transcript)\b)/i;
-  var QUOTE_MARKERS = /("[^"]{12,}"|\u201c[^\u201d]{12,}\u201d)/;
   var HEDGE_MARKERS = /\b(may|might|could|possibly|preliminary|unconfirmed|alleged|allegedly|reportedly|appears? to|suggests?|estimated|about|roughly)\b/i;
   var ABSOLUTE_MARKERS = /\b(always|never|everyone|nobody|no one|all|none|guaranteed|proven|undeniable|obviously|clearly|certainly|100%)\b/i;
 
-  function classifyEvidence(sentence) {
-    if (SOURCE_MARKERS.test(sentence)) return 'named';
-    if (DOCUMENT_MARKERS.test(sentence) && /(https?:\/\/|\.pdf|report|circular|notification|order|gazette|filing)/i.test(sentence)) return 'doc';
-    if (QUOTE_MARKERS.test(sentence)) return 'quote';
-    if (/\d/.test(sentence)) return 'figures';
-    return 'none';
+  // Ordered by strength. The first match wins.
+  var SOURCE_TAXONOMY = [
+    { kind: 'document', strength: 4,
+      test: function (s) {
+        return /(https?:\/\/\S+|\.pdf\b|circular|notification|gazette|filing|transcript|white paper|annual report)/i.test(s)
+          && /(published|issued|filed|released|available|attached|read|notification|circular|gazette)/i.test(s);
+      } },
+    { kind: 'court-or-ministry', strength: 4,
+      test: function (s) { return /(the (court|ministry|department|commission|authority|bureau|board|tribunal) (of|said|ruled|ordered|notified)|supreme court|high court|government of|gov\.in)/i.test(s); } },
+    { kind: 'academic', strength: 3,
+      test: function (s) { return /(peer[- ]reviewed|published in (the )?(journal|lancet|nature|science)|study (published|in)|university (researchers|study)|preprint)/i.test(s); } },
+    { kind: 'named-official', strength: 3,
+      test: function (s) { return /(spokesperson|press release|said in a statement|told (reporters|the court|the paper|journalists)|according to (the )?(minister|secretary|director|commissioner|official))/i.test(s); } },
+    { kind: 'news-agency', strength: 2,
+      test: function (s) { return /(as reported by|reported by (reuters|pti|ani|ap|afp)|news agency|wire report)/i.test(s); } },
+    { kind: 'anonymous', strength: 1,
+      test: function (s) { return /(sources? (say|said|claim|close to)|officials? (said|familiar)|on condition of anonymity|insiders? said|it is (said|believed))/i.test(s); } },
+    { kind: 'figures-only', strength: 1,
+      test: function (s) { return /\d/.test(s); } },
+    { kind: 'nothing', strength: 0, test: function () { return true; } }
+  ];
+
+  function classifySource(sentence) {
+    for (var i = 0; i < SOURCE_TAXONOMY.length; i++) {
+      if (SOURCE_TAXONOMY[i].test(sentence)) return SOURCE_TAXONOMY[i];
+    }
+    return SOURCE_TAXONOMY[SOURCE_TAXONOMY.length - 1];
   }
 
-  var EVIDENCE_LABEL = {
-    doc: 'linked document',
-    named: 'named source',
-    quote: 'direct quote',
-    figures: 'figures only',
-    none: 'nothing offered'
-  };
+  var QUOTE_PATTERN = /"([^"]{12,})"|\u201c([^\u201d]{12,})\u201d/;
+
+  function quoteAttribution(sentence) {
+    var match = QUOTE_PATTERN.exec(sentence);
+    if (!match) return null;
+    var quote = match[1] || match[2];
+    // who is named around the quote: "X said" or "said X" or ", said a spokesperson"
+    var attributed = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(said|told|added|wrote|argued|noted)\b/.test(sentence)
+      || /\b(said|according to)\s+(a|the)\s+(spokesperson|minister|official|secretary|director)\b/i.test(sentence)
+      || /\b(spokesperson|minister|official|secretary|director|professor|researcher)\b/i.test(sentence);
+    return { quote: quote, attributed: attributed };
+  }
+
+  function segment(text) {
+    var normalised = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!normalised) return [];
+    var rough = normalised.split(/(?<=[.!?])\s+/);
+    var out = [];
+    rough.forEach(function (piece) {
+      var lastWord = (out.length ? out[out.length - 1] : '').split(/\s+/).pop().replace(/[^A-Za-z]/g, '').toLowerCase();
+      if (out.length && ABBREVIATIONS.indexOf(lastWord) !== -1) {
+        out[out.length - 1] = out[out.length - 1] + ' ' + piece;
+      } else {
+        out.push(piece);
+      }
+    });
+    return out.map(function (s) { return s.trim(); }).filter(Boolean);
+  }
 
   function readText(raw) {
     var text = String(raw || '').replace(/\s+/g, ' ').trim();
     if (!text) return { ok: false, reason: 'Nothing entered.' };
 
-    var sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/).map(function (s) { return s.trim(); });
     var claims = [];
-
-    sentences.forEach(function (sentence) {
+    segment(text).forEach(function (sentence) {
       if (sentence.split(/\s+/).length < 5) return;
       if (!ASSERTION_MARKERS.test(sentence)) return;
+      var source = classifySource(sentence);
+      var quote = quoteAttribution(sentence);
       claims.push({
         text: sentence,
-        evidence: classifyEvidence(sentence),
+        kind: source.kind,
+        strength: source.strength,
+        quote: quote ? quote.quote : null,
+        quoteAttributed: quote ? quote.attributed : null,
         hedged: HEDGE_MARKERS.test(sentence),
         absolute: ABSOLUTE_MARKERS.test(sentence),
-        specific: /\d/.test(sentence) || /\b(1[89]\d{2}|20\d{2})\b/.test(sentence)
+        specific: /\d/.test(sentence)
       });
     });
 
-    var counts = { doc: 0, named: 0, quote: 0, figures: 0, none: 0 };
-    claims.forEach(function (claim) { counts[claim.evidence]++; });
+    var byKind = {};
+    claims.forEach(function (claim) { byKind[claim.kind] = (byKind[claim.kind] || 0) + 1; });
 
-    var supported = counts.doc + counts.named + counts.quote;
+    var strong = claims.filter(function (c) { return c.strength >= 3; }).length;
+    var weak = claims.filter(function (c) { return c.strength === 1; }).length;
+    var nothing = claims.filter(function (c) { return c.strength === 0; }).length;
+    var unattributedQuotes = claims.filter(function (c) { return c.quote && !c.quoteAttributed; }).length;
     var absolutes = claims.filter(function (c) { return c.absolute; }).length;
     var hedged = claims.filter(function (c) { return c.hedged; }).length;
 
     var headline, tone;
-    if (!claims.length) {
-      headline = 'Nothing here asserts a fact'; tone = WARN;
-    } else if (counts.none === claims.length) {
-      headline = 'Every claim is unsourced'; tone = FAIL;
-    } else if (supported === 0) {
-      headline = 'Figures with no source behind them'; tone = FAIL;
-    } else if (supported >= Math.ceil(claims.length / 2)) {
-      headline = 'Most claims name where they came from'; tone = PASS;
-    } else {
-      headline = 'Some claims are sourced, some are not'; tone = WARN;
-    }
+    if (!claims.length) { headline = 'Nothing here asserts a fact'; tone = WARN; }
+    else if (strong >= Math.ceil(claims.length / 2)) { headline = 'Most claims name a source that could be checked'; tone = PASS; }
+    else if (strong > 0) { headline = 'Some claims are sourced, some are not'; tone = WARN; }
+    else if (weak > 0) { headline = 'Figures and unnamed officials, no checkable source'; tone = FAIL; }
+    else { headline = 'Every claim is unsourced'; tone = FAIL; }
 
-    if (absolutes && tone === PASS) { headline = 'Sourced, but written in absolutes'; tone = WARN; }
+    if (tone === PASS && absolutes) { headline = 'Sourced, but written in absolutes'; tone = WARN; }
+    if (unattributedQuotes) { headline = 'A quotation with nobody named as saying it'; tone = tone === PASS ? WARN : tone; }
 
-    return {
-      ok: true, claims: claims, counts: counts, headline: headline, tone: tone,
-      supported: supported, absolutes: absolutes, hedged: hedged, total: claims.length
-    };
+    return { ok: true, claims: claims, byKind: byKind, headline: headline, tone: tone,
+             strong: strong, weak: weak, nothing: nothing, absolutes: absolutes, hedged: hedged,
+             unattributedQuotes: unattributedQuotes, total: claims.length };
   }
   // CORE>>
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { readLink: readLink, readText: readText, parseAddress: parseAddress,
-      ownerOf: ownerOf, skeleton: skeleton, looksDisguised: looksDisguised, disguiseMatch: disguiseMatch,
-      classifyEvidence: classifyEvidence, isLocalHost: isLocalHost, isNumericHost: isNumericHost };
+    module.exports = {
+      readLink: readLink, readText: readText, parseAddress: parseAddress, ownerOf: ownerOf,
+      skeleton: skeleton, looksDisguised: looksDisguised, disguiseMatch: disguiseMatch,
+      punycodeDecode: punycodeDecode, decodeHost: decodeHost, scriptsIn: scriptsIn, latinize: latinize,
+      hasMixedScripts: hasMixedScripts, letterStats: letterStats, looksGenerated: looksGenerated,
+      pathRisks: pathRisks, classifySource: classifySource, quoteAttribution: quoteAttribution,
+      segment: segment, isLocalHost: isLocalHost, isNumericHost: isNumericHost,
+      WATCHED_NAMES: WATCHED_NAMES, SOURCE_TAXONOMY: SOURCE_TAXONOMY
+    };
   }
 
   /* ---------------- rendering ---------------- */
@@ -469,8 +714,8 @@
     }
     $('url-verdict').textContent = result.headline;
     $('url-verdict').className = 'verdict ' + CLASS[result.tone];
-    $('url-byline').textContent = 'owned by ' + result.owner + '  ·  ' +
-      result.checks.length + ' questions, ' + result.failed + ' failed, ' + result.warned + ' noted';
+    $('url-byline').textContent = 'owned by ' + result.owner + '  ·  renders as ' + result.rendered +
+      '  ·  ' + result.checks.length + ' questions, ' + result.failed + ' failed, ' + result.warned + ' noted';
 
     $('url-list').innerHTML = result.checks.map(function (check) {
       return '<div class="q"><dt><span class="g ' + CLASS[check.verdict] + '">' + GLYPH[check.verdict] + '</span>' +
@@ -478,10 +723,20 @@
     }).join('');
   }
 
-  var SUPPORT = {
-    doc: 'linked document', named: 'named source', quote: 'direct quote',
-    figures: 'figures only', none: 'nothing offered'
+  var KIND_LABEL = {
+    'document': 'linked document',
+    'court-or-ministry': 'court or ministry',
+    'academic': 'academic study',
+    'named-official': 'named official',
+    'news-agency': 'news agency',
+    'anonymous': 'unnamed officials',
+    'figures-only': 'figures only',
+    'nothing': 'nothing offered'
   };
+
+  function strengthClass(strength) {
+    return strength >= 3 ? 'doc' : strength === 2 ? 'named' : strength === 1 ? 'figures' : 'none';
+  }
 
   function drawText() {
     var result = readText($('text').value);
@@ -498,29 +753,35 @@
     $('text-verdict').textContent = result.headline;
     $('text-verdict').className = 'verdict ' + CLASS[result.tone];
     $('text-byline').textContent = result.total + ' assertion' + (result.total === 1 ? '' : 's') +
-      ', ' + result.supported + ' with support attached';
+      '  ·  ' + result.strong + ' with a checkable source';
 
     $('claim-body').innerHTML = result.claims.length
       ? result.claims.map(function (claim) {
+          var label = KIND_LABEL[claim.kind] || claim.kind;
+          if (claim.quote && !claim.quoteAttributed) label = 'quote, nobody named';
           return '<tr><td>' + esc(claim.text) + '</td>' +
-            '<td><span class="ev ' + claim.evidence + '">' + SUPPORT[claim.evidence] + '</span></td></tr>';
+            '<td><span class="ev ' + strengthClass(claim.strength) + '">' + esc(label) + '</span></td></tr>';
         }).join('')
       : '<tr><td colspan="2">No sentence here asserts a fact. It reads as opinion.</td></tr>';
 
     $('tally').innerHTML =
-      'sourced <b>' + result.supported + '</b> &nbsp;·&nbsp; unsourced <b>' + result.counts.none + '</b> &nbsp;·&nbsp; ' +
-      'figures only <b>' + result.counts.figures + '</b> &nbsp;·&nbsp; hedged <b>' + result.hedged + '</b> &nbsp;·&nbsp; ' +
-      'absolutes <b>' + result.absolutes + '</b>';
+      'checkable <b>' + result.strong + '</b> &nbsp;·&nbsp; weak <b>' + result.weak + '</b> &nbsp;·&nbsp; ' +
+      'unsourced <b>' + result.nothing + '</b> &nbsp;·&nbsp; hedged <b>' + result.hedged + '</b> &nbsp;·&nbsp; ' +
+      'absolutes <b>' + result.absolutes + '</b>' +
+      (result.unattributedQuotes ? ' &nbsp;·&nbsp; unattributed quotes <b>' + result.unattributedQuotes + '</b>' : '');
   }
 
   var LINKS = {
     typo: 'http://paypa1-secure.com/verify?session=9f2a',
+    homograph: 'https://xn--80ak6aa92e.com/account/login',
+    trojan: 'https://download-centre.example/invoice.pdf.exe',
     short: 'https://bit.ly/3xK9pQz',
     real: 'https://github.com/QuantumCoder-14/claimcheck'
   };
   var TEXTS = {
     forward: 'SHOCKING: everyone knows the banks are hiding this. Sources say the new rule will take every account. Forward this to all your contacts before it is deleted!!!',
-    report: 'The ministry of health said in a statement on Tuesday that 1,240 cases were recorded in 2024. "The figures are preliminary and may be revised," a spokesperson told reporters. A notification published on the ministry website sets out the reporting rules.'
+    report: 'The ministry of health said in a statement on Tuesday that 1,240 cases were recorded in 2024. "The figures are preliminary and may be revised," a spokesperson told reporters. A notification published on the ministry website sets out the reporting rules.',
+    barequote: 'The note says "the figures were revised upward again" without naming anyone.'
   };
 
   document.querySelectorAll('[data-sample]').forEach(function (button) {
