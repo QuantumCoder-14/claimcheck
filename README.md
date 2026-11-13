@@ -8,9 +8,9 @@ with every point explained.**
 Two panels: paste a link and see what is structurally wrong with it, or paste a message and see
 whether it is written like reporting or like a forward.
 
-This is a **client-side reimplementation of DeepShield 3.3**, a project written by another
-student and since handed over to this repository's author. DeepShield needs a Python backend
-and a local LLM; this runs from a single HTML file, so it can live on the open web. See
+This is a **client-side reimplementation of an earlier project** written by another student and
+since handed over to this repository's author. That original needs a Python backend and a local
+LLM; this runs from a single HTML file, so it can live on the open web. See
 [CREDITS.md](CREDITS.md).
 
 ## The link model, unchanged
@@ -70,11 +70,11 @@ always win. Four words minimum, 0.35 threshold, six results at most.
 
 ## What this cannot do
 
-- **It cannot tell you whether a claim is true.** DeepShield verifies claims against public
+- **It cannot tell you whether a claim is true.** The original verifies claims against public
   fact-check APIs and a local LLM; that needs a backend and is not part of this page. What
   remains is style analysis, which catches forwards and propaganda patterns, not confident
   liars who write well.
-- **It has no live threat feed.** DeepShield's blocklists are refreshed from public feeds by the
+- **It has no live threat feed.** The original's blocklists are refreshed from public feeds by the
   backend. A static page cannot do that, so link scoring is structural only.
 - **It cannot see the sender, the certificate chain, or the redirect path.** Those need network
   access the page deliberately does not have.
