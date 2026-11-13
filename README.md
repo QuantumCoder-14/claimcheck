@@ -4,56 +4,66 @@
 
 **[Live: quantumcoder-14.github.io/claimcheck](https://quantumcoder-14.github.io/claimcheck/)**
 
-Two panels, no score to take on faith. One reads a link's identity. The other reads a text's
-claims and says what, if anything, backs each one.
+Two readings, no score to take on faith. One reads an address; the other reads a text's
+assertions and says what kind of source stands behind each.
 
-## Links: five questions, not a number
+## Part one: seven questions about an address
 
-Instead of adding weights into a risk score, the page asks five questions and answers each with
-a verdict and a reason:
-
-| Question | Fails when |
+| Question | What it examines |
 | --- | --- |
-| Is the name honest? | The domain is dressed up to read as a name people log into |
-| Is the connection encrypted? | The address is plain `http` |
-| Does it go where it appears to? | A shortener, a redirect in the query string, or a raw IP |
-| Is it a public site? | It points at a loopback, private or cloud-metadata address |
-| Is the address itself clean? | Punycode, embedded credentials, heavy encoding, deep subdomains, padding |
+| Is the name honest? | Punycode decoded back to Unicode, scripts compared, letters transliterated and skeleton-matched against names people log into |
+| Is the connection encrypted? | `https` versus plain `http` |
+| Does it go where it appears to? | Shorteners, destinations carried in the query string, raw IPs |
+| Is it a public site? | Loopback, private ranges and cloud-metadata addresses |
+| Is the name a word, or a keyboard mash? | Vowel ratio, digit density, consonant runs — what throwaway domains look like |
+| Is the path itself dangerous? | Executables, double extensions, account-pressure words, opaque parameters |
+| Is the address itself clean? | Punycode, embedded credentials, encoding density, subdomain depth |
 
-The headline comes from **how many questions failed and which ones** — a dishonest name or a
-private address is disqualifying on its own, while a single cosmetic oddity is not. Every row
-shows its reasoning, so there is nothing to trust blindly.
+The headline comes from **which** questions failed. A dishonest name, a private address or a
+dangerous path is disqualifying on its own; a single cosmetic oddity is not.
 
-### How the name check works
+### The three tricks in the name check
 
-`paypa1-secure.com` is not one character away from `paypal.com` — it is two, so edit distance
-misses it. Instead the domain is reduced to a **skeleton**: digits that read as letters are
-swapped (`1`→`l`, `0`→`o`, `5`→`s`), lookalike pairs are folded (`rn`→`m`, `vv`→`w`), doubled
-letters collapse, punctuation is dropped. `paypa1secure` and `paypal` then meet in the middle,
-and so do `rnicrosoft` and `microsoft`, and `g00gle` and `google`.
+**Punycode decoding.** Browsers hand you `xn--80ak6aa92e` and render `аррӏе`. To say anything
+true about that, the label is decoded with a full RFC 3492 implementation, so the reading names
+what the reader actually sees.
 
-## Text: a table of evidence
+**Transliteration.** `аррӏе` is *entirely* Cyrillic, so "mixed scripts" detection never fires.
+Instead the common confusable letters are folded to Latin — `а`→`a`, `ӏ`→`l`, `р`→`p` — which
+turns the label into `apple` and exposes the homograph.
 
-For each sentence that actually asserts something, the page names the evidence attached to it:
+**Skeleton matching.** `paypa1-secure` is not one edit from `paypal`, it is two, so edit distance
+misses it. Digits that read as letters are folded (`1`→`l`, `0`→`o`), lookalike pairs collapse
+(`rn`→`m`), doubled letters merge, punctuation drops — then `paypa1secure` and `paypal` meet in
+the middle.
 
-- **linked document** — a circular, notification, filing or URL
-- **named source** — a ministry, court, spokesperson, or "according to the department"
-- **direct quote** — a quoted line
-- **figures only** — numbers with nothing behind them
-- **nothing offered** — the common case
+## Part two: what backs each claim
 
-"Sources say" deliberately counts as *nothing offered*: an authority nobody can check is not
-evidence. The tally underneath counts sourced claims, unsourced ones, hedges and absolutes, and
-the headline changes when a well-sourced piece is still written in absolutes.
+Every sentence that asserts something is tagged with the **kind** of source behind it, strongest
+first:
+
+| Kind | Strength |
+| --- | --- |
+| linked document — circular, notification, gazette, filing | 4 |
+| court or ministry | 4 |
+| academic study — peer-reviewed, journal, preprint | 3 |
+| named official — spokesperson, press release, "said in a statement" | 3 |
+| news agency — Reuters, PTI, ANI | 2 |
+| unnamed officials — "sources say", "on condition of anonymity" | 1 |
+| figures only | 1 |
+| nothing offered | 0 |
+
+"Sources say" deliberately scores **1, not 3**: an authority nobody can name cannot be checked.
+Quotes are inspected separately — a quotation with nobody named as saying it is flagged as such,
+and sentence splitting understands `Dr.`, `Mr.` and `e.g.` so those do not become fragments.
 
 ## What this cannot do
 
-- **It cannot tell you whether a claim is true.** It tells you whether anyone is named who could
-  be checked.
-- **It cannot see the sender, the certificate, or where a shortener leads.** Those need network
-  access the page does not have.
-- **A clean link is not a safe page.** An honest domain can host a scam, and an ugly address can
-  be a legitimate internal tool.
+- **It cannot tell you whether a claim is true.** It tells you whether a checkable source exists.
+- **It cannot follow a link.** No redirect resolution, no certificate inspection, no live feeds —
+  those need network access the page does not have.
+- **A clean address is not a safe page.** Honest domains host swindles; ugly addresses belong to
+  legitimate internal tools.
 
 ## Privacy
 
@@ -62,13 +72,14 @@ No server, no analytics, no storage. Nothing you paste leaves the tab.
 ## Tests
 
 ```bash
-node tests/test.js     # 63 assertions
+node tests/test.js     # 81 assertions
 ```
 
-The skeleton matcher in both directions (`paypa1` and `rnicrosoft` collapse, `example` does
-not), ownership parsing for `co.in` style domains, each of the five questions in pass, warn and
-fail states, the disqualifying-failure rule, and evidence classification — including that
-"sources say" is *not* a named source.
+Covers the punycode decoder against known values (`bcher-kva` → `bücher`, `80ak6aa92e` → `аррӏе`)
+and its rejection of invalid input; transliteration; script detection; skeleton matching in both
+directions; readability heuristics; all six path hazards; each of the seven questions in pass,
+warn and fail states; abbreviation-aware segmentation; the full source taxonomy including that
+anonymous sources outrank nothing but lose to named ones; and quote attribution.
 
 ## Licence
 
