@@ -205,7 +205,7 @@
       not a fact-check, and a low one is not proof of a lie.
     </p>
     <p class="note">
-      The link model is a direct port of the scoring documented in DeepShield's
+      The link model is a direct port of the scoring documented in the original project's
       <code>docs/SCORING.md</code>: <code>score = 100 − clamp(35 + Σ weights, 0, 100)</code>. The same
       evidence always produces the same number, and every point is shown.
     </p>
@@ -228,7 +228,7 @@
 
   /* ================= CORE (tested separately) ================= */
   // <<CORE
-  // Weights copied verbatim from DeepShield's docs/SCORING.md. Higher = more risk.
+  // Weights copied verbatim from the original project's scoring document. Higher = more risk.
   var URL_WEIGHTS = {
     'transport.no_https': 6,
     'transport.https_valid': -8,
@@ -248,7 +248,7 @@
 
   var BASELINE_RISK = 35;
 
-  // The three lists below are DeepShield's own, ported as-is.
+  // The three lists below are the original project's own, ported as-is.
   var MULTI_PART_SUFFIXES = ['co.in','co.uk','com.au','org.uk','ac.uk','gov.in','nic.in','net.in',
     'org.in','co.nz','com.br','com.cn','gov.cn','co.za','com.mx','co.kr','com.sg','com.hk',
     'co.il','com.tr','com.tw','com.ar','com.my','com.pk','com.bd','com.np','com.lk','co.id',
@@ -485,7 +485,7 @@
     };
   }
 
-  // ---------- claim extraction, ported from DeepShield's claim_extractor ----------
+  // ---------- claim extraction, ported from the original's claim extractor ----------
   var ASSERTION_VERBS = ['is','are','was','were','has','have','had','will','can','may','causes','cause',
     'caused','reduces','reduced','increases','increased','prevents','prevented','approved','announced',
     'launched','banned','killed','died','won','wins','recorded','reached','contains','consists',
