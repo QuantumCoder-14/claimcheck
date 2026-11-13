@@ -83,6 +83,8 @@ eq('public host not private', api.isPrivateHost('example.com'), false);
 ok('typosquat link scores worse', api.analyseUrl('https://gooogle.com').score < api.analyseUrl('https://example.com').score);
 eq('long url threshold is 120', api.analyseUrl('https://example.com/' + 'a'.repeat(100)).signals.some(s => s.id === 'url.long_url'), false);
 eq('over 120 triggers long url', api.analyseUrl('https://example.com/' + 'a'.repeat(120)).signals.some(s => s.id === 'url.long_url'), true);
+eq('brand in own registrable domain not flagged', api.analyseUrl('https://login.sbi.co.in').signals.some(s => s.id === 'url.brand_in_subdomain'), false);
+eq('brand in foreign subdomain flagged', api.analyseUrl('https://paypal.evil.com').signals.some(s => s.id === 'url.brand_in_subdomain'), true);
 eq('advisory for private host', api.analyseUrl('http://192.168.0.1/admin').advisories.length, 1);
 ok('factual score rewards numbers', api.factualScore('The ministry recorded 1,240 cases in 2024.') > api.factualScore('Things happened recently at some point.'));
 ok('factual score penalises hedging', api.factualScore('The report maybe was perhaps wrong.') < api.factualScore('The report recorded 1,240 cases.'));
