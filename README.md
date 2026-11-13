@@ -8,10 +8,10 @@ with every point explained.**
 Two panels: paste a link and see what is structurally wrong with it, or paste a message and see
 whether it is written like reporting or like a forward.
 
-This is a **client-side reimplementation of DeepShield 3.3**, an earlier student project by a
-classmate, used with his permission. DeepShield needs a Python backend and a local LLM; this
-runs from a single HTML file, so it can live on the open web. See [CREDITS.md](CREDITS.md) for
-exactly what came from his design and what is new here.
+This is a **client-side reimplementation of DeepShield 3.3**, an earlier student project, used
+with the original author's written permission. DeepShield needs a Python backend and a local
+LLM; this runs from a single HTML file, so it can live on the open web. See
+[CREDITS.md](CREDITS.md).
 
 ## The link model, unchanged
 
