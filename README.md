@@ -8,10 +8,10 @@ with every point explained.**
 Two panels: paste a link and see what is structurally wrong with it, or paste a message and see
 whether it is written like reporting or like a forward.
 
-This is a **client-side port of DeepShield 3.3** — the same author's local-first
-website-safety and credibility system. DeepShield needs a Python backend and a local LLM;
-this runs from a single HTML file, so it can live on the open web. The scoring model is not
-reinvented: the link weights are copied verbatim from DeepShield's `docs/SCORING.md`.
+This is a **client-side reimplementation of DeepShield 3.3**, an earlier student project by a
+classmate, used with his permission. DeepShield needs a Python backend and a local LLM; this
+runs from a single HTML file, so it can live on the open web. See [CREDITS.md](CREDITS.md) for
+exactly what came from his design and what is new here.
 
 ## The link model, unchanged
 
@@ -40,8 +40,13 @@ score = 100 − risk
 | `url.many_encoded_chars` | +6 |
 | `url.long_url` | +5 |
 
-Bands, also from the original documentation: 0-34 critical · 35-59 elevated · 60-79 moderate ·
-80-100 lower.
+Bands, also from the original: 0-34 critical · 35-59 elevated · 60-79 moderate · 80-100 lower.
+
+The analyser behind those numbers is ported too, not approximated: the same brand, TLD and
+shortener lists, the same multi-part registrable-domain handling (`co.in` and friends), the same
+typosquat rule — **one Levenshtein edit from a brand of five letters or more**, which catches
+`gooogle.com` where a substring check would not — and the same 120-character threshold for a
+long URL. Private, loopback and cloud-metadata hosts get a plain-language advisory.
 
 Every row in the results panel shows the signal id, the points it added, why it matters, and
 the exact substring that triggered it. The line under the list shows the arithmetic, so the
@@ -58,8 +63,10 @@ and on the positive side, named sources, appropriate hedging, and direct quotati
 score = clamp(50 + Σ weights, 0, 100)
 ```
 
-50 means "no signals either way". The panel then lists the **checkable sentences** — the ones
-carrying figures, years or attribution — so you know which lines are worth verifying yourself.
+50 means "no signals either way". The panel then lists the **checkable sentences**, ranked with
+his factual-score formula: numbers, years, assertion verbs, superlatives and proper nouns add
+weight; hedging subtracts; the total is divided by sentence length so long sentences do not
+always win. Four words minimum, 0.35 threshold, six results at most.
 
 ## What this cannot do
 
@@ -81,14 +88,15 @@ disappear when you close the tab.
 ## Tests
 
 ```bash
-node tests/test.js     # 45 assertions
+node tests/test.js     # 62 assertions
 ```
 
 Includes the model's documented invariants — baseline risk, the HTTPS adjustment, clamping at
 0 and 100, every band boundary — plus a check that **all fourteen documented weights are
-present**, so a future edit cannot silently drop one. Also parsing edge cases (garbage, `ftp://`,
-missing scheme), credibility scoring on a sensational forward versus careful reporting, claim
-extraction ordering, and determinism for both models.
+present**, so a future edit cannot silently drop one. The ported internals are tested directly:
+registrable-domain extraction, Levenshtein distance, typosquat detection (`gooogle.com` flagged,
+`google.com` not), private-host detection, the 120-character threshold at both sides, the
+private-address advisory, and the claim scorer rewarding figures while penalising hedging.
 
 ## Licence
 
