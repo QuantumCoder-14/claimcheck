@@ -380,8 +380,13 @@
     }
 
     var labels = bare.split('.');
-    if (labels.length > 3 && BRANDS.some(function (brand) { return labels.slice(0, -2).join('.').indexOf(brand) !== -1; })) {
-      add('url.brand_in_subdomain', 'A brand name sits in a subdomain, which the real owner does not control.', bare);
+    // Original rule: the brand must appear in the host but NOT in its registrable domain,
+    // otherwise login.sbi.co.in would be flagged for being SBI.
+    var brandInSubdomain = BRANDS.some(function (brand) {
+      return host.indexOf(brand) !== -1 && reg.indexOf(brand) === -1;
+    });
+    if (brandInSubdomain) {
+      add('url.brand_in_subdomain', 'A brand name sits in a subdomain of a domain it does not own.', bare);
     }
 
     var tld = labels[labels.length - 1];
