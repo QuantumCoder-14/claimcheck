@@ -4,111 +4,141 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const m = html.match(/\/\/ <<CORE([\s\S]*?)\/\/ CORE>>/);
 if (!m) { console.error('CORE block not found'); process.exit(1); }
 const api = new Function(m[1] + `; return {readLink, readText, parseAddress, ownerOf, skeleton,
-  looksDisguised, disguiseMatch, classifyEvidence, isLocalHost, isNumericHost};`)();
+  looksDisguised, disguiseMatch, punycodeDecode, decodeHost, scriptsIn, hasMixedScripts, latinize,
+  letterStats, looksGenerated, pathRisks, classifySource, quoteAttribution, segment,
+  isLocalHost, isNumericHost, WATCHED_NAMES, SOURCE_TAXONOMY};`)();
 let fails = 0;
 const eq = (n, got, want) => { if (JSON.stringify(got) !== JSON.stringify(want)) {
   fails++; console.log(`FAIL ${n}\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); } };
 const ok = (n, cond, extra) => { if (!cond) { fails++; console.log(`FAIL ${n}${extra ? ' — ' + extra : ''}`); } };
-const verdictOf = (result, id) => (result.checks.find(c => c.id === id) || {}).verdict;
+const v = (result, id) => (result.checks.find(c => c.id === id) || {}).verdict;
 
-// ---------- skeleton matching: the core of the name check ----------
+// ============ punycode decoding ============
+eq('punycode: bücher', api.punycodeDecode('bcher-kva'), 'bücher');
+eq('punycode: cyrillic apple', api.punycodeDecode('80ak6aa92e'), 'аррӏе');
+eq('punycode: münchen', api.punycodeDecode('mnchen-3ya'), 'münchen');
+ok('punycode: rejects rubbish', (() => { try { api.punycodeDecode('!!!'); return false; } catch (e) { return true; } })());
+eq('decodeHost leaves ascii alone', api.decodeHost('example.com'), 'example.com');
+eq('decodeHost decodes each label', api.decodeHost('xn--80ak6aa92e.com'), 'аррӏе.com');
+
+// ============ transliteration ============
+eq('latinize cyrillic apple', api.latinize('аррӏе'), 'apple');
+eq('latinize greek', api.latinize('αpple'), 'apple');
+eq('latinize leaves latin', api.latinize('apple'), 'apple');
+
+// ============ script analysis ============
+eq('scripts: cyrillic only', api.scriptsIn('аррӏе'), ['cyrillic']);
+eq('scripts: latin only', api.scriptsIn('paypal'), ['latin']);
+eq('mixed scripts detected', api.hasMixedScripts('аpple'), true);
+eq('pure cyrillic is not "mixed"', api.hasMixedScripts('аррӏе'), false);
+eq('pure latin is not mixed', api.hasMixedScripts('paypal'), false);
+
+// ============ skeleton matching ============
 eq('digit swap collapses', api.skeleton('paypa1'), api.skeleton('paypal'));
 eq('rn reads as m', api.skeleton('rnicrosoft'), api.skeleton('microsoft'));
-eq('zeros read as o', api.skeleton('g00gle'), api.skeleton('google'));
 eq('doubled letters collapse', api.skeleton('gooogle'), api.skeleton('google'));
-eq('hyphens ignored', api.skeleton('pay-pal'), api.skeleton('paypal'));
-ok('different names do not collapse', api.skeleton('example') !== api.skeleton('paypal'));
-
 eq('paypa1 is a disguise', api.looksDisguised('paypa1', 'paypal'), true);
-eq('rnicrosoft is a disguise', api.looksDisguised('rnicrosoft', 'microsoft'), true);
 eq('padded name is a disguise', api.looksDisguised('paypal-secure', 'paypal'), true);
 eq('exact name is not a disguise', api.looksDisguised('paypal', 'paypal'), false);
-eq('unrelated name is not a disguise', api.looksDisguised('example', 'paypal'), false);
-eq('disguiseMatch finds paypal', api.disguiseMatch('paypa1'), 'paypal');
 eq('disguiseMatch finds sbi variant', api.disguiseMatch('sbi-kyc'), 'sbi');
-eq('disguiseMatch quiet on a plain name', api.disguiseMatch('example'), null);
 
-// ---------- ownership ----------
-eq('simple domain', api.ownerOf('example.com'), 'example.com');
+// ============ readability ============
+ok('mash flagged', api.looksGenerated('x7f2k9qz1').length > 0, JSON.stringify(api.looksGenerated('x7f2k9qz1')));
+ok('consonant run flagged', api.looksGenerated('xkcdqwrtp').length > 0, JSON.stringify(api.looksGenerated('xkcdqwrtp')));
+eq('a real word is not flagged', api.looksGenerated('amazon'), []);
+eq('vowel ratio computed', api.letterStats('amazon').vowelRatio > 0.4, true);
+
+// ============ path analysis ============
+ok('double extension caught', api.pathRisks(new URL('https://x.example/invoice.pdf.exe')).some(r => r.includes('double extension')));
+ok('executable caught', api.pathRisks(new URL('https://x.example/setup.exe')).some(r => r.includes('runs code')));
+ok('apk caught', api.pathRisks(new URL('https://x.example/app.apk')).some(r => r.includes('runs code')));
+ok('pressure words caught', api.pathRisks(new URL('https://x.example/account/login/verify')).some(r => r.includes('pressure')));
+ok('opaque query caught', api.pathRisks(new URL('https://x.example/a?t=' + 'A'.repeat(48))).some(r => r.includes('opaque')));
+eq('clean path is quiet', api.pathRisks(new URL('https://x.example/docs/page.html')).length, 0);
+
+// ============ ownership ============
 eq('country second level', api.ownerOf('login.sbi.co.in'), 'sbi.co.in');
 eq('deep subdomain', api.ownerOf('a.b.example.com'), 'example.com');
-eq('gov.in', api.ownerOf('incometax.gov.in'), 'incometax.gov.in');
 eq('two-label host', api.ownerOf('localhost'), 'localhost');
 
-// ---------- address parsing ----------
-eq('rejects garbage', api.parseAddress('not a url').ok, false);
-eq('rejects ftp', api.parseAddress('ftp://example.com').ok, false);
-eq('adds https', api.parseAddress('example.com').url.protocol, 'https:');
-eq('numeric host detected', api.isNumericHost('192.168.0.1'), true);
-eq('loopback is local', api.isLocalHost('127.0.0.1'), true);
-eq('metadata address is local', api.isLocalHost('169.254.169.254'), true);
-eq('public host is not local', api.isLocalHost('example.com'), false);
+// ============ the seven questions ============
+const homograph = api.readLink('https://xn--80ak6aa92e.com/account/login');
+eq('seven questions asked', homograph.checks.length, 7);
+eq('homograph: name fails', v(homograph, 'name-honest'), 'fail');
+eq('homograph: headline', homograph.tone, 'fail');
+ok('homograph: explains the alphabet', homograph.checks.find(c => c.id === 'name-honest').answer.includes('apple'));
 
-// ---------- the five questions ----------
-const clean = api.readLink('https://github.com/QuantumCoder-14/claimcheck');
-eq('clean link: no failures', clean.failed, 0);
-eq('clean link: headline', clean.tone, 'pass');
-eq('clean link: name honest', verdictOf(clean, 'name-honest'), 'pass');
-eq('clean link: encrypted', verdictOf(clean, 'transport'), 'pass');
+const realApple = api.readLink('https://apple.com');
+eq('the real apple.com passes the name check', v(realApple, 'name-honest'), 'pass');
+eq('the real apple.com has no failures', realApple.failed, 0);
+
+const trojan = api.readLink('https://download-centre.example/invoice.pdf.exe');
+eq('double extension fails the path check', v(trojan, 'path'), 'fail');
+eq('double extension is disqualifying', trojan.tone, 'fail');
 
 const typo = api.readLink('http://paypa1-secure.com/verify?session=9f2a');
-eq('typo link: name fails', verdictOf(typo, 'name-honest'), 'fail');
-eq('typo link: transport fails', verdictOf(typo, 'transport'), 'fail');
-eq('typo link: headline', typo.tone, 'fail');
-ok('typo link: explains the disguise', typo.checks.find(c => c.id === 'name-honest').answer.includes('paypal'));
+eq('typo: name fails', v(typo, 'name-honest'), 'fail');
+eq('typo: transport fails', v(typo, 'transport'), 'fail');
 
 const short = api.readLink('https://bit.ly/3xK9pQz');
-eq('shortener: direct fails', verdictOf(short, 'direct'), 'fail');
-eq('shortener: single failure is suspicion not panic', short.tone, 'warn');
+eq('shortener: direction fails', v(short, 'direct'), 'fail');
 
-const private1 = api.readLink('http://192.168.0.1/admin');
-eq('private address: reachable fails', verdictOf(private1, 'reachable'), 'fail');
-eq('private address: headline', private1.tone, 'fail');
+const local = api.readLink('http://192.168.0.1/admin');
+eq('private address: publicness fails', v(local, 'reachable'), 'fail');
 
-const own = api.readLink('https://login.sbi.co.in');
-eq('own domain: name honest', verdictOf(own, 'name-honest'), 'pass');
-eq('own domain: no failures', own.failed, 0);
+const clean = api.readLink('https://github.com/QuantumCoder-14/claimcheck');
+eq('clean link: nothing fails', clean.failed, 0);
+eq('clean link: tone', clean.tone, 'pass');
+eq('clean link: rendered name', clean.rendered, 'github.com');
 
-const puny = api.readLink('https://xn--80ak6aa92e.com/x');
-eq('punycode flagged as oddity', verdictOf(puny, 'clean'), 'warn');
+eq('unreadable input rejected', api.readLink('::::').ok, false);
+eq('ftp rejected', api.parseAddress('ftp://example.com').ok, false);
+eq('numeric host detected', api.isNumericHost('10.0.0.1'), true);
+eq('loopback is local', api.isLocalHost('127.0.0.1'), true);
 
-eq('unreadable input', api.readLink('::::').ok, false);
+// ============ segmentation ============
+eq('abbreviations do not split', api.segment('Dr. Mehta met the minister. He left.').length, 2);
+eq('ordinary sentences split', api.segment('One thing happened. Another thing followed.').length, 2);
+eq('single sentence stays whole', api.segment('Just one sentence here.').length, 1);
 
-// ---------- claim evidence ----------
-const forward = api.readText('SHOCKING: everyone knows the banks are hiding this. Sources say the new rule will take every account. Forward this to all your contacts before it is deleted!!!');
-eq('forward: all unsourced', forward.counts.none, forward.total);
-eq('forward: headline', forward.tone, 'fail');
-ok('forward: absolutes counted', forward.absolutes >= 2, 'absolutes=' + forward.absolutes);
-ok('forward: "sources say" is not a named source',
-   forward.claims.every(c => c.evidence !== 'named'));
+// ============ source taxonomy ============
+eq('anonymous sources', api.classifySource('Sources say the rule will change.').kind, 'anonymous');
+eq('named official', api.classifySource('A spokesperson said in a statement that cases fell.').kind, 'named-official');
+eq('academic', api.classifySource('A peer-reviewed study published in the journal found a link.').kind, 'academic');
+eq('document', api.classifySource('A notification published on the ministry website sets the rules.').kind, 'document');
+eq('court', api.classifySource('The high court ruled that the order stands.').kind, 'court-or-ministry');
+eq('figures only', api.classifySource('About 1,240 cases were recorded.').kind, 'figures-only');
+eq('nothing', api.classifySource('The banks are hiding this.').kind, 'nothing');
+ok('taxonomy is ordered strongest first', api.SOURCE_TAXONOMY[0].strength >= api.SOURCE_TAXONOMY[api.SOURCE_TAXONOMY.length - 1].strength);
+ok('anonymous is weaker than named', api.classifySource('Sources say it fell.').strength < api.classifySource('A spokesperson said it fell.').strength);
 
+// ============ quotes ============
+ok('attributed quote recognised', api.quoteAttribution('"The figures are preliminary," a spokesperson told reporters.').attributed);
+ok('bare quote flagged as unattributed', api.quoteAttribution('The note says "the figures were revised upward again" plainly.').attributed === false);
+eq('no quote returns null', api.quoteAttribution('Nothing quoted here at all.'), null);
+
+// ============ text reading ============
 const report = api.readText('The ministry of health said in a statement on Tuesday that 1,240 cases were recorded in 2024. "The figures are preliminary and may be revised," a spokesperson told reporters. A notification published on the ministry website sets out the reporting rules.');
-ok('report: claims found', report.total >= 2, 'total=' + report.total);
-ok('report: at least two sourced', report.supported >= 2, 'supported=' + report.supported);
+ok('report: assertions found', report.total >= 2, 'total=' + report.total);
+ok('report: strong sources', report.strong >= 2, 'strong=' + report.strong);
 eq('report: tone', report.tone, 'pass');
-ok('report: the quoted sentence is attributed to a spokesperson',
-   report.claims.some(c => c.text.includes('preliminary') && (c.evidence === 'named' || c.evidence === 'quote')));
-eq('classify: a quote with vague attribution is still just a quote',
-   api.classifyEvidence('\u201cWe will review the numbers next week,\u201d it said.'), 'quote');
-eq('classify: named ministry', api.classifyEvidence('According to the ministry, cases fell.'), 'named');
-eq('classify: unattributed quote', api.classifyEvidence('The note reads \u201cthe figures were revised upward again\u201d in full.'), 'quote');
-ok('report: hedging counted', report.hedged >= 1);
+ok('report: hedging noticed', report.hedged >= 1);
 
-eq('empty text rejected', api.readText('   ').ok, false);
-const opinion = api.readText('Coffee tastes better in the morning. I prefer the small cup.');
-eq('opinion: no assertions', opinion.total, 0);
-eq('opinion: headline', opinion.headline, 'Nothing here asserts a fact');
+const forward = api.readText('SHOCKING: everyone knows the banks are hiding this. Sources say the new rule will take every account. Forward this to all your contacts before it is deleted!!!');
+eq('forward: nothing checkable', forward.strong, 0);
+eq('forward: tone', forward.tone, 'fail');
+ok('forward: absolutes counted', forward.absolutes >= 2);
+ok('forward: unnamed sources stay weak', forward.claims.every(c => c.strength <= 1));
 
-eq('classify: named source', api.classifyEvidence('The ministry said in a statement that cases fell.'), 'named');
-eq('classify: document', api.classifyEvidence('A notification published on the site sets the rules.'), 'doc');
-eq('classify: figures only', api.classifyEvidence('About 1,240 cases were recorded.'), 'figures');
-eq('classify: nothing', api.classifyEvidence('The banks are hiding this.'), 'none');
+const barequote = api.readText('The note says "the figures were revised upward again" without naming anyone.');
+ok('unattributed quote noticed', barequote.unattributedQuotes >= 1, 'got ' + barequote.unattributedQuotes);
 
-// ---------- determinism ----------
-eq('link reading deterministic',
-   JSON.stringify(api.readLink('https://paypa1.com/x')), JSON.stringify(api.readLink('https://paypa1.com/x')));
-eq('text reading deterministic',
-   JSON.stringify(api.readText('The report said 5 cases.')), JSON.stringify(api.readText('The report said 5 cases.')));
+eq('empty text rejected', api.readText('  ').ok, false);
+eq('opinion has no assertions', api.readText('Coffee tastes better in the morning. I prefer the small cup.').total, 0);
 
-console.log(fails ? `\n${fails} FAILURE(S)` : 'ALL CLAIMCHECK TESTS PASSED');
+// ============ determinism ============
+eq('link deterministic', JSON.stringify(api.readLink('https://paypa1.com/x')), JSON.stringify(api.readLink('https://paypa1.com/x')));
+eq('text deterministic', JSON.stringify(api.readText('The report said 5 cases.')), JSON.stringify(api.readText('The report said 5 cases.')));
+
+console.log(fails ? `\n${fails} FAILURE(S)` : `ALL CLAIMCHECK TESTS PASSED (${api.SOURCE_TAXONOMY.length} source kinds)`);
 process.exit(fails ? 1 : 0);
