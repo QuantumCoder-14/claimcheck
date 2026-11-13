@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClaimCheck — link risk and text credibility, scored in your browser</title>
-<meta name="description" content="Check a link's technical risk and a piece of text's credibility signals. Deterministic scoring, every point explained, nothing uploaded.">
+<title>ClaimCheck — what a link really is, and what evidence a claim offers</title>
+<meta name="description" content="Read a link's identity and a text's evidence in your browser: who owns the domain, whether the name is honest, and which claims come with a source. Nothing uploaded.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
     --grid:rgba(120,170,220,0.055);
     --line:rgba(140,190,235,0.20); --line-soft:rgba(140,190,235,0.10);
     --ink:#dce8f2; --dim:#8fa8bd; --faint:#5f7789;
-    --good:#57d39b; --warn:#e8b84b; --bad:#f0796b;
+    --pass:#57d39b; --warn:#e8b84b; --fail:#f0796b;
     --accent:#7cc4ff;
     --sans:'Archivo',system-ui,sans-serif;
     --mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -22,11 +22,11 @@
   }
   @media (prefers-color-scheme: light){
     :root{
-      --bg:#eef3f8; --bg2:#f6f9fc; --panel:#fff;
+      --bg:#eef3f8; --bg2:#f7fafc; --panel:#fff;
       --grid:rgba(20,60,110,0.05);
       --line:rgba(20,60,110,0.22); --line-soft:rgba(20,60,110,0.10);
       --ink:#11202e; --dim:#4a6178; --faint:#7d92a5;
-      --good:#127a52; --warn:#8a6100; --bad:#a8342a;
+      --pass:#127a52; --warn:#8a6100; --fail:#a8342a;
       --accent:#0b5fa5;
     }
   }
@@ -43,17 +43,15 @@
   .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
   h1{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-.03em;line-height:1.05}
   h1 span{color:var(--accent)}
-  .tag{color:var(--dim);font-size:14px;margin-top:7px;max-width:56ch}
+  .tag{color:var(--dim);font-size:14px;margin-top:7px;max-width:58ch}
   .badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);
     border:1px solid var(--line);padding:5px 11px;white-space:nowrap}
-
-  nav{display:flex;gap:0;border-bottom:1px solid var(--line-soft);margin-top:22px}
+  nav{display:flex;border-bottom:1px solid var(--line-soft);margin-top:22px}
   nav button{appearance:none;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
     font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
     padding:11px 18px 9px}
   nav button:hover{color:var(--ink)}
   nav button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
-
   main{padding:24px 0 56px}
   .pane{display:none}.pane.on{display:block}
   label{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:6px}
@@ -68,43 +66,42 @@
   button.act.primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:500}
   button.act.primary:hover{filter:brightness(1.08);color:var(--bg)}
 
-  .result{margin-top:20px;border:1px solid var(--line);background:var(--panel);border-radius:4px;overflow:hidden;display:none}
-  .result.on{display:block}
-  .result__head{display:grid;grid-template-columns:auto 1fr;gap:20px;padding:20px 22px;align-items:center;
-    border-bottom:1px solid var(--line-soft)}
-  @media(max-width:620px){.result__head{grid-template-columns:1fr}}
-  .dial{position:relative;width:104px;height:104px;flex:none}
-  .dial svg{transform:rotate(-90deg)}
-  .dial b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:30px;font-weight:700;letter-spacing:-.03em}
-  .verdict{font-size:20px;font-weight:600;letter-spacing:-.01em;margin-bottom:3px}
-  .verdict__sub{font-size:13px;color:var(--dim)}
-  .verdict__sub code{font-family:var(--mono);font-size:11.5px;background:var(--bg2);padding:1px 5px;border-radius:2px}
+  .card{margin-top:20px;border:1px solid var(--line);background:var(--panel);border-radius:4px;overflow:hidden;display:none}
+  .card.on{display:block}
+  .card__head{padding:16px 20px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;
+    gap:14px;align-items:center;flex-wrap:wrap}
+  .headline{font-size:19px;font-weight:600;letter-spacing:-.01em}
+  .headline.pass{color:var(--pass)}.headline.warn{color:var(--warn)}.headline.fail{color:var(--fail)}
+  .sub{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .sub code{background:var(--bg2);padding:1px 5px;border-radius:2px;color:var(--dim)}
 
-  .sig{padding:12px 22px;border-bottom:1px solid var(--line-soft);display:grid;
-    grid-template-columns:auto 1fr auto;gap:14px;align-items:baseline}
-  .sig:last-child{border-bottom:none}
-  .sig__pts{font-family:var(--mono);font-size:12px;font-weight:500;min-width:42px;text-align:right}
-  .sig__pts.neg{color:var(--good)}.sig__pts.pos{color:var(--bad)}.sig__pts.zero{color:var(--faint)}
-  .sig__id{font-family:var(--mono);font-size:11.5px;color:var(--accent);margin-bottom:2px}
-  .sig__why{font-size:13px;color:var(--dim)}
-  .sig__hit{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:3px;word-break:break-all}
-  .empty{padding:20px 22px;color:var(--dim);font-size:13.5px}
-  .maths{padding:14px 22px;background:var(--bg2);border-top:1px solid var(--line-soft);
-    font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.8}
+  .check{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:13px 20px;border-bottom:1px solid var(--line-soft)}
+  .check:last-child{border-bottom:none}
+  .mark{font-family:var(--mono);font-size:12px;width:20px;height:20px;display:flex;align-items:center;
+    justify-content:center;border-radius:50%;margin-top:2px;flex:none}
+  .mark.pass{background:rgba(87,211,155,0.14);color:var(--pass)}
+  .mark.warn{background:rgba(232,184,75,0.14);color:var(--warn)}
+  .mark.fail{background:rgba(240,121,107,0.14);color:var(--fail)}
+  .q{font-weight:600;font-size:14px}
+  .a{font-size:13px;color:var(--dim);margin-top:2px}
+  .a code{font-family:var(--mono);font-size:11.5px;background:var(--bg2);padding:1px 5px;border-radius:2px;color:var(--ink)}
 
-  .claims{margin-top:18px;border:1px solid var(--line);background:var(--panel);border-radius:4px;display:none}
-  .claims.on{display:block}
-  .claims h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;
-    color:var(--faint);padding:12px 20px;border-bottom:1px solid var(--line-soft);font-weight:500}
-  .claim{padding:12px 20px;border-bottom:1px solid var(--line-soft);cursor:pointer;display:grid;
-    grid-template-columns:1fr auto;gap:12px;align-items:center}
-  .claim:last-child{border-bottom:none}
-  .claim:hover{background:var(--bg2)}
-  .claim__text{font-family:var(--serif);font-size:14px;line-height:1.5}
-  .claim__score{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
-  .claim__tags{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:5px;letter-spacing:.04em}
-
+  .claims{width:100%;border-collapse:collapse;font-size:13.5px}
+  .claims th{text-align:left;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--faint);padding:9px 20px;border-bottom:1px solid var(--line-soft);font-weight:500}
+  .claims td{padding:11px 20px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  .claims tr:last-child td{border-bottom:none}
+  .claims td:first-child{font-family:var(--serif);line-height:1.45;max-width:62ch}
+  .evidence{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:3px;white-space:nowrap}
+  .evidence.doc{background:rgba(87,211,155,0.14);color:var(--pass)}
+  .evidence.named{background:rgba(124,196,255,0.14);color:var(--accent)}
+  .evidence.quote{background:rgba(124,196,255,0.10);color:var(--accent)}
+  .evidence.figures{background:rgba(232,184,75,0.14);color:var(--warn)}
+  .evidence.none{background:rgba(240,121,107,0.12);color:var(--fail)}
+  .tally{display:flex;gap:18px;flex-wrap:wrap;padding:14px 20px;background:var(--bg2);border-top:1px solid var(--line-soft);
+    font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .tally b{color:var(--ink);font-weight:500}
+  .empty{padding:20px;color:var(--dim);font-size:13.5px}
   .note{font-size:12.5px;color:var(--faint);margin-top:14px;line-height:1.6;max-width:74ch}
   .disclaimer{margin-top:22px;padding:13px 16px;border-left:2px solid var(--warn);background:rgba(232,184,75,0.07);
     font-size:12.5px;color:var(--dim);border-radius:0 3px 3px 0}
@@ -121,13 +118,13 @@
     <div class="top">
       <div>
         <h1>ClaimCheck<span>.</span></h1>
-        <p class="tag">Score a link's technical risk, or a piece of text's credibility signals. Deterministic, explained point by point, and computed in this tab.</p>
+        <p class="tag">Two questions, answered plainly: what is this link actually pointing at, and what evidence does this claim come with?</p>
       </div>
       <span class="badge">nothing uploaded</span>
     </div>
     <nav role="tablist">
-      <button role="tab" id="t-link" aria-selected="true" aria-controls="p-link">Link risk</button>
-      <button role="tab" id="t-text" aria-selected="false" aria-controls="p-text">Text credibility</button>
+      <button role="tab" id="t-link" aria-selected="true" aria-controls="p-link">Link identity</button>
+      <button role="tab" id="t-text" aria-selected="false" aria-controls="p-text">Claim evidence</button>
     </nav>
   </div>
 </header>
@@ -139,75 +136,54 @@
       <label for="url">A link, as you received it</label>
       <input type="text" id="url" spellcheck="false" placeholder="https://example.com/page?x=1">
       <div class="row">
-        <button class="act primary" id="check-url">Check the link</button>
+        <button class="act primary" id="check-url">Read the link</button>
+        <button class="act" data-sample="typo">sample: paypa1-secure</button>
         <button class="act" data-sample="short">sample: shortened</button>
-        <button class="act" data-sample="lookalike">sample: lookalike</button>
-        <button class="act" data-sample="clean">sample: ordinary</button>
+        <button class="act" data-sample="real">sample: ordinary</button>
       </div>
 
-      <div class="result" id="url-result">
-        <div class="result__head">
-          <div class="dial">
-            <svg width="104" height="104" viewBox="0 0 104 104">
-              <circle cx="52" cy="52" r="45" fill="none" stroke="var(--line-soft)" stroke-width="7"></circle>
-              <circle id="url-arc" cx="52" cy="52" r="45" fill="none" stroke="var(--accent)" stroke-width="7"
-                      stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"></circle>
-            </svg>
-            <b id="url-score">—</b>
-          </div>
+      <div class="card" id="url-card">
+        <div class="card__head">
           <div>
-            <div class="verdict" id="url-verdict">—</div>
-            <div class="verdict__sub" id="url-sub">—</div>
+            <div class="headline" id="url-headline">—</div>
+            <div class="sub" id="url-sub">—</div>
           </div>
         </div>
-        <div id="url-signals"></div>
-        <div class="maths" id="url-maths"></div>
+        <div id="url-checks"></div>
       </div>
     </section>
 
     <section class="pane" id="p-text" role="tabpanel" aria-labelledby="t-text">
       <label for="text">The text you were sent</label>
-      <textarea id="text" spellcheck="false" placeholder="Paste the message, forward, or article paragraph."></textarea>
+      <textarea id="text" spellcheck="false" placeholder="Paste the message, forward, or a paragraph of an article."></textarea>
       <div class="row">
-        <button class="act primary" id="check-text">Check the text</button>
-        <button class="act" data-sample="sensational">sample: sensational forward</button>
-        <button class="act" data-sample="sober">sample: careful reporting</button>
+        <button class="act primary" id="check-text">Read the claims</button>
+        <button class="act" data-sample="forward">sample: a forward</button>
+        <button class="act" data-sample="report">sample: a report</button>
       </div>
 
-      <div class="result" id="text-result">
-        <div class="result__head">
-          <div class="dial">
-            <svg width="104" height="104" viewBox="0 0 104 104">
-              <circle cx="52" cy="52" r="45" fill="none" stroke="var(--line-soft)" stroke-width="7"></circle>
-              <circle id="text-arc" cx="52" cy="52" r="45" fill="none" stroke="var(--accent)" stroke-width="7"
-                      stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"></circle>
-            </svg>
-            <b id="text-score">—</b>
-          </div>
+      <div class="card" id="text-card">
+        <div class="card__head">
           <div>
-            <div class="verdict" id="text-verdict">—</div>
-            <div class="verdict__sub" id="text-sub">—</div>
+            <div class="headline" id="text-headline">—</div>
+            <div class="sub" id="text-sub">—</div>
           </div>
         </div>
-        <div id="text-signals"></div>
-        <div class="maths" id="text-maths"></div>
-      </div>
-
-      <div class="claims" id="claims">
-        <h3>Checkable sentences, weakest first</h3>
-        <div id="claimlist"></div>
+        <table class="claims" id="claim-table">
+          <thead><tr><th>What it asserts</th><th>Evidence offered</th></tr></thead>
+          <tbody id="claim-body"></tbody>
+        </table>
+        <div class="tally" id="tally"></div>
       </div>
     </section>
 
     <p class="disclaimer">
-      This reads structure, not truth. It cannot tell you whether a claim is factually correct —
-      only whether the text is written like reliable reporting or like a forward. A high score is
-      not a fact-check, and a low one is not proof of a lie.
+      This tells you what a link is made of and what a claim is backed by. It cannot tell you
+      whether the claim is true — only whether anyone is named who could be checked.
     </p>
     <p class="note">
-      The link model is a direct port of the scoring documented in the original project's
-      <code>docs/SCORING.md</code>: <code>score = 100 − clamp(35 + Σ weights, 0, 100)</code>. The same
-      evidence always produces the same number, and every point is shown.
+      No score to trust and no model to take on faith: every answer here is a question with a
+      yes, a no, or a "can't tell from the text", and the reasoning sits next to it.
     </p>
 
   </div>
@@ -228,319 +204,309 @@
 
   /* ================= CORE (tested separately) ================= */
   // <<CORE
-  // Weights copied verbatim from the original project's scoring document. Higher = more risk.
-  var URL_WEIGHTS = {
-    'transport.no_https': 6,
-    'transport.https_valid': -8,
-    'url.ip_literal_host': 25,
-    'url.punycode_host': 22,
-    'url.lookalike_domain': 20,
-    'url.brand_in_subdomain': 15,
-    'url.suspicious_tld': 12,
-    'url.excessive_subdomains': 6,
-    'url.long_url': 5,
-    'url.many_encoded_chars': 6,
-    'url.credentials_in_url': 15,
-    'url.nonstandard_port': 8,
-    'url.encoded_redirect': 12,
-    'url.url_shortener': 10
-  };
+  // ---------------------------------------------------------------------------
+  // Design: this asks five questions about a link and answers each one with a
+  // verdict, instead of adding up weights into a single number. The headline is
+  // derived from how many questions failed, and which ones.
+  // ---------------------------------------------------------------------------
 
-  var BASELINE_RISK = 35;
+  var PASS = 'pass', WARN = 'warn', FAIL = 'fail';
 
-  // The three lists below are the original project's own, ported as-is.
-  var MULTI_PART_SUFFIXES = ['co.in','co.uk','com.au','org.uk','ac.uk','gov.in','nic.in','net.in',
-    'org.in','co.nz','com.br','com.cn','gov.cn','co.za','com.mx','co.kr','com.sg','com.hk',
-    'co.il','com.tr','com.tw','com.ar','com.my','com.pk','com.bd','com.np','com.lk','co.id',
-    'com.ph','com.vn'];
+  // Second-level labels that belong to a country code, so "sbi.co.in" is owned by
+  // "sbi.co.in" and not by "co.in".
+  var COUNTRY_SECOND_LEVEL = ['co', 'com', 'net', 'org', 'gov', 'ac', 'edu', 'nic', 'firm', 'gen', 'ind'];
 
-  var SUSPICIOUS_TLDS = ['zip','mov','top','xyz','click','country','gq','tk','ml','cf','ga','work',
-    'review','loan','mom','kim','cricket','science','party','stream','download','racing','win','bid',
-    'quest','cam','rest','monster','buzz','surf','bar','link'];
+  // Names worth checking for disguise. Chosen for the audience: Indian banking,
+  // payments and government, plus the global services people actually log into.
+  var WATCHED_NAMES = ['sbi', 'hdfc', 'hdfcbank', 'icici', 'icicibank', 'axis', 'axisbank', 'kotak',
+    'paytm', 'phonepe', 'gpay', 'bhim', 'upi', 'aadhaar', 'irctc', 'incometax', 'epfo', 'nsdl',
+    'paypal', 'google', 'gmail', 'microsoft', 'outlook', 'apple', 'icloud', 'amazon', 'flipkart',
+    'facebook', 'instagram', 'whatsapp', 'netflix', 'linkedin', 'dropbox', 'steam', 'binance',
+    'coinbase', 'metamask', 'chase', 'wellsfargo', 'bankofamerica', 'roblox', 'epicgames'];
 
-  var URL_SHORTENERS = ['bit.ly','t.co','goo.gl','tinyurl.com','ow.ly','is.gd','buff.ly','rebrand.ly',
-    'cutt.ly','shorte.st','adf.ly','bit.do','rb.gy','tiny.cc','shorturl.at','t.ly','s.id'];
+  // Domains that own their own name, so a match here is not a disguise.
+  var LEGITIMATE_OWNERS = ['sbi.co.in', 'onlinesbi.sbi', 'hdfcbank.com', 'icicibank.com', 'axisbank.com',
+    'kotak.com', 'paytm.com', 'phonepe.com', 'google.com', 'gmail.com', 'microsoft.com', 'apple.com',
+    'amazon.in', 'amazon.com', 'flipkart.com', 'facebook.com', 'instagram.com', 'whatsapp.com',
+    'netflix.com', 'linkedin.com', 'dropbox.com', 'steampowered.com', 'binance.com', 'coinbase.com',
+    'metamask.io', 'chase.com', 'wellsfargo.com', 'bankofamerica.com', 'roblox.com', 'epicgames.com',
+    'irctc.co.in', 'incometax.gov.in', 'epfindia.gov.in', 'uidai.gov.in'];
 
-  var BRANDS = ['paypal','google','gmail','microsoft','outlook','office365','apple','icloud','amazon',
-    'facebook','instagram','whatsapp','netflix','sbi','hdfcbank','icicibank','axisbank','kotak','paytm',
-    'phonepe','gpay','flipkart','linkedin','dropbox','coinbase','binance','metamask','bankofamerica',
-    'chase','wellsfargo','steam','roblox','epicgames','netbanking','upi','aadhaar','irctc','incometax'];
+  var SHORTENING_SERVICES = ['bit.ly', 't.co', 'tinyurl.com', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly',
+    'rebrand.ly', 'cutt.ly', 'rb.gy', 'tiny.cc', 'shorturl.at', 't.ly', 's.id', 'shorte.st', 'adf.ly'];
 
-  var REPUTABLE = ['wikipedia.org','github.com','bbc.co.uk','bbc.com','reuters.com','apnews.com',
-    'nature.com','science.org','who.int','un.org','nasa.gov','isro.gov.in','gov.in','nic.in','rbi.org.in'];
+  // ---------------------------------------------------------------------------
+  // Name disguise: compare letter-skeletons rather than edit distance.
+  // "paypa1" and "paypal" collapse to the same skeleton; "rnicrosoft" and
+  // "microsoft" do too, because rn reads as m at small sizes. This is a
+  // different technique from counting single-character edits, and it catches
+  // digit and lookalike-letter swaps that edit distance treats as two edits.
+  // ---------------------------------------------------------------------------
+  var CONFUSABLE_DIGITS = { '0': 'o', '1': 'l', '3': 'e', '5': 's', '4': 'a', '7': 't', '8': 'b', '9': 'g' };
+  var CONFUSABLE_PAIRS = [['rn', 'm'], ['vv', 'w'], ['cl', 'd'], ['ii', 'u'], ['l1', 'll']];
 
-  var PRIVATE_HOSTNAMES = ['localhost','localhost.localdomain','ip6-localhost','metadata',
-    'metadata.google.internal','instance-data'];
-  var METADATA_IPS = ['169.254.169.254','100.100.100.200','fd00:ec2::254'];
-
-  function parseUrl(raw) {
-    var text = String(raw || '').trim();
-    if (!text) return null;
-    if (/[\u0000-\u001f]/.test(text)) return null;
-    var hadScheme = /^[a-z][a-z0-9+.\-]*:\/\//i.test(text);
-    var candidate = hadScheme ? text : 'https://' + text;
-    var url;
-    try { url = new URL(candidate); } catch (err) { return null; }
-    if (!/^https?:$/.test(url.protocol)) return null;
-    var host = url.hostname.toLowerCase();
-    return {
-      url: url, host: host, bare: host.replace(/^www\./, ''),
-      reg: registrableDomain(host),
-      hadScheme: hadScheme, isHttps: url.protocol === 'https:',
-      port: url.port, path: url.pathname, search: url.search
-    };
+  function skeleton(text) {
+    var value = String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    value = value.replace(/[01345789]/g, function (digit) { return CONFUSABLE_DIGITS[digit] || digit; });
+    CONFUSABLE_PAIRS.forEach(function (pair) {
+      value = value.split(pair[0]).join(pair[1]);
+    });
+    // collapse doubled letters, so "gooogle" and "google" meet in the middle
+    return value.replace(/(.)\1+/g, '$1');
   }
 
-  function registrableDomain(host) {
-    var labels = String(host || '').toLowerCase().replace(/\.$/, '').split('.');
-    if (labels.length <= 2) return labels.join('.');
-    var last2 = labels.slice(-2).join('.');
-    if (MULTI_PART_SUFFIXES.indexOf(last2) !== -1) return labels.slice(-3).join('.');
-    return last2;
+  function looksDisguised(hostCore, watchedName) {
+    if (!hostCore || !watchedName) return false;
+    if (hostCore === watchedName) return false;
+    var a = skeleton(hostCore);
+    var b = skeleton(watchedName);
+    if (a === b) return true;
+    // A watched name padded with extra words: "paypal-secure", "sbi-kyc-verify".
+    // Compare skeletons here too, or "paypa1-secure" walks straight past the check.
+    return a.length > b.length && a.indexOf(b) !== -1;
   }
 
-  function isIpHost(host) {
-    return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || (host.indexOf(':') !== -1 && /^[0-9a-f:\[\]]+$/i.test(host));
-  }
-
-  function isPrivateHost(host) {
-    var h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
-    if (!h) return true;
-    if (PRIVATE_HOSTNAMES.indexOf(h) !== -1 || METADATA_IPS.indexOf(h) !== -1) return true;
-    if (/\.(local|internal|localhost)$/.test(h)) return true;
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
-      var parts = h.split('.').map(Number);
-      if (parts[0] === 10 || parts[0] === 127) return true;
-      if (parts[0] === 192 && parts[1] === 168) return true;
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-      if (parts[0] === 169 && parts[1] === 254) return true;
-      if (parts[0] === 0) return true;
-    }
-    return false;
-  }
-
-  function levenshtein(a, b) {
-    if (a === b) return 0;
-    if (!a.length) return b.length;
-    if (!b.length) return a.length;
-    var prev = [], i, j;
-    for (j = 0; j <= b.length; j++) prev[j] = j;
-    for (i = 1; i <= a.length; i++) {
-      var current = [i];
-      for (j = 1; j <= b.length; j++) {
-        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
-        current[j] = Math.min(current[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
-      }
-      prev = current;
-    }
-    return prev[b.length];
-  }
-
-  function lookalikeBrand(host, reg) {
-    if (!reg) return null;
-    var core = reg.split('.')[0];
-    for (var i = 0; i < BRANDS.length; i++) {
-      var brand = BRANDS[i];
-      if (core === brand) continue;
-      if (core.indexOf(brand) !== -1) return brand;
-      // one edit away from a brand of five letters or more is a typosquat
-      if (brand.length >= 5 && levenshtein(core, brand) === 1) return brand;
-    }
-    for (var k = 0; k < BRANDS.length; k++) {
-      if (host.indexOf(BRANDS[k]) !== -1 && reg.indexOf(BRANDS[k]) === -1) return BRANDS[k];
+  function disguiseMatch(hostCore) {
+    for (var i = 0; i < WATCHED_NAMES.length; i++) {
+      if (looksDisguised(hostCore, WATCHED_NAMES[i])) return WATCHED_NAMES[i];
     }
     return null;
   }
 
-  function analyseUrl(raw) {
-    var parsed = parseUrl(raw);
-    if (!parsed) {
-      return { ok: false, error: 'That does not parse as an http(s) URL.' };
-    }
-    var host = parsed.host, bare = parsed.bare, reg = parsed.reg;
-    var signals = [], advisories = [];
-    function add(id, why, hit) {
-      signals.push({ id: id, points: URL_WEIGHTS[id], why: why, hit: hit || '' });
-    }
-
-    if (!parsed.isHttps) {
-      add('transport.no_https', 'Served over plain HTTP, so the connection can be read or altered in transit.', parsed.url.protocol);
-    } else {
-      add('transport.https_valid', 'Uses HTTPS. This says the connection is encrypted, not that the site is honest.', 'https');
-    }
-
-    if (isIpHost(host)) add('url.ip_literal_host', 'The host is a raw IP address. Real services use names, because addresses change.', host);
-    if (isPrivateHost(host)) advisories.push('This points at a private, loopback or cloud-metadata address. It is not a public website, and nothing legitimate asks you to open one from a message.');
-    if (host.indexOf('xn--') === 0 || host.indexOf('.xn--') !== -1) add('url.punycode_host', 'Punycode in the host: lookalike letters can render as a familiar name.', host);
-
-    var isReputable = REPUTABLE.some(function (domain) { return bare === domain || bare.endsWith('.' + domain); });
-    var impersonated = lookalikeBrand(host, reg);
-    if (impersonated && !isReputable) {
-      add('url.lookalike_domain', 'The registrable domain imitates "' + impersonated + '" without being it — a substring match or a single-character edit.', reg);
-    }
-
-    var labels = bare.split('.');
-    // Original rule: the brand must appear in the host but NOT in its registrable domain,
-    // otherwise login.sbi.co.in would be flagged for being SBI.
-    var brandInSubdomain = BRANDS.some(function (brand) {
-      return host.indexOf(brand) !== -1 && reg.indexOf(brand) === -1;
-    });
-    if (brandInSubdomain) {
-      add('url.brand_in_subdomain', 'A brand name sits in a subdomain of a domain it does not own.', bare);
-    }
-
-    var tld = labels[labels.length - 1];
-    if (SUSPICIOUS_TLDS.indexOf(tld) !== -1) add('url.suspicious_tld', '.' + tld + ' is a TLD that appears in phishing far more than its market share.', reg);
-
-    if (labels.length > 4) add('url.excessive_subdomains', 'Unusually deep subdomain chain (' + labels.length + ' labels).', bare);
-    if (parsed.url.href.length > 120) add('url.long_url', 'Long URL (' + parsed.url.href.length + ' characters), often used to bury the real destination.', '');
-    var encoded = (parsed.search.match(/%[0-9a-f]{2}/gi) || []).length;
-    if (encoded > 5) add('url.many_encoded_chars', encoded + ' percent-encoded sequences in the query string.', '');
-    if (parsed.url.username || parsed.url.password) add('url.credentials_in_url', 'Contains credentials before the host, a classic disguise.', parsed.url.username + ':***');
-    if (parsed.port && parsed.port !== '80' && parsed.port !== '443') add('url.nonstandard_port', 'Non-standard port ' + parsed.port + '.', parsed.port);
-    if (/[?&](url|redirect|next|target|dest|goto|r)=/i.test(parsed.search)) add('url.encoded_redirect', 'Carries a redirect target in the query string, so the visible link is not the destination.', '');
-    if (URL_SHORTENERS.indexOf(bare) !== -1) add('url.url_shortener', 'A shortener hides where the link actually goes until you click it.', bare);
-
-    var risk = signals.reduce(function (total, signal) { return total + signal.points; }, BASELINE_RISK);
-    risk = Math.max(0, Math.min(100, risk));
-    var score = 100 - risk;
-
-    return {
-      ok: true, score: score, risk: risk, host: bare, registrable: reg, signals: signals,
-      advisories: advisories, band: band(score), verdict: verdictFor(score)
-    };
-  }
-
-  function band(score) {
-    if (score <= 34) return 'critical';
-    if (score <= 59) return 'elevated';
-    if (score <= 79) return 'moderate';
-    return 'lower';
-  }
-
-  function verdictFor(score) {
-    if (score <= 34) return 'Treat this link as hostile';
-    if (score <= 59) return 'Risky — do not enter credentials';
-    if (score <= 79) return 'Caution — verify the destination';
-    return 'No structural red flags';
-  }
-
-  // ---------- text credibility ----------
-  var TEXT_SIGNALS = [
-    { id: 'sensational', weight: -12, label: 'Sensational framing',
-      why: 'Words chosen to provoke shock rather than inform.',
-      test: function (t) { return /(shocking|bombshell|you won't believe|miracle|banned|exposed|outrage|horrifying|terrifying|insane|mind[- ]blowing)/i.test(t); } },
-    { id: 'forwarded', weight: -14, label: 'Chain-message phrasing',
-      why: 'Forwards ask you to pass them on, which is how unverified claims travel.',
-      test: function (t) { return /(forward(ed)? (as received|to all|this to)|share (this )?(with )?(all|everyone|10 people)|copy paste|circulate (this )?(widely|maximum))/i.test(t); } },
-    { id: 'allcaps', weight: -8, label: 'Shouting',
-      why: 'Long runs of capitals are used for emphasis instead of evidence.',
-      test: function (t) { return (t.match(/\b[A-Z]{4,}\b/g) || []).length >= 3; } },
-    { id: 'exclaim', weight: -6, label: 'Exclamation stacking',
-      why: 'Three or more exclamation marks signals urgency over accuracy.',
-      test: function (t) { return (t.match(/!/g) || []).length >= 3; } },
-    { id: 'vague-source', weight: -12, label: 'Unnamed authority',
-      why: '"Sources say" is an authority that cannot be checked, so it is not evidence.',
-      test: function (t) { return /(sources? (say|said|claim|confirm)|experts? (say|agree|warn)|scientists? (confirm|discover|prove)|studies? (show|prove)|reportedly|it is (said|believed))/i.test(t); } },
-    { id: 'absolute', weight: -8, label: 'Absolute certainty',
-      why: 'Careful reporting hedges. "Everyone knows" and "100% proven" do not.',
-      test: function (t) { return /(everyone knows|nobody (knows|talks)|100% (proven|guaranteed|safe)|never fails|always works|undeniable|beyond (any )?doubt)/i.test(t); } },
-    { id: 'conspiracy', weight: -14, label: 'Conspiracy framing',
-      why: 'A claim that survives because the evidence is hidden cannot be tested — which is the point of the framing.',
-      test: function (t) { return /(mainstream media (won't|will not|refuses)|they don't want you to know|hidden (truth|agenda)|big pharma|cover[- ]?up|wake up|sheeple|suppressed by)/i.test(t); } },
-    { id: 'no-date', weight: -5, label: 'No date or place',
-      why: 'Checkable reporting says when. Undated claims get recycled for years.',
-      test: function (t) { return !/\b(1[89]\d{2}|20\d{2})\b/.test(t) && !/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(t); } },
-    { id: 'no-numbers', weight: -4, label: 'No figures',
-      why: 'Specifics are checkable; vagueness is not.',
-      test: function (t) { return !/\d/.test(t); } },
-    { id: 'link-bait', weight: -6, label: 'Link bait',
-      why: 'Asks you to click before telling you what happened.',
-      test: function (t) { return /(click (here|this link|to (see|find out))|watch (this )?video|see what happened)/i.test(t); } },
-    { id: 'sourced', weight: 12, label: 'Named source or document',
-      why: 'A ministry, court, journal or named official can be checked. The strongest positive signal.',
-      test: function (t) { return /(according to (the )?(ministry|department|court|report|press release)|(ministry|department|court|commission|authority) of|peer[- ]reviewed|said in a (statement|release)|spokesperson)/i.test(t); } },
-    { id: 'hedged', weight: 8, label: 'Appropriate hedging',
-      why: 'Words like "may", "preliminary" and "unconfirmed" are what honest reporting sounds like.',
-      test: function (t) { return /(may (be|have)|preliminary|unconfirmed|allegedly|appears? to|could not be independently verified)/i.test(t); } },
-    { id: 'attributed-quote', weight: 8, label: 'Direct quotation',
-      why: 'A quoted, attributed line can be traced back to the speaker.',
-      test: function (t) { return /("[^"]{15,}"|\u201c[^\u201d]{15,}\u201d)/.test(t); } }
-  ];
-
-  function scoreText(raw) {
+  // ---------------------------------------------------------------------------
+  // Address parsing
+  // ---------------------------------------------------------------------------
+  function parseAddress(raw) {
     var text = String(raw || '').trim();
-    if (!text) return { ok: false, error: 'Nothing to check.' };
-    var signals = [];
-    TEXT_SIGNALS.forEach(function (signal) {
-      if (signal.test(text)) {
-        signals.push({ id: signal.id, points: signal.weight, why: signal.why, label: signal.label });
-      }
-    });
-    var total = signals.reduce(function (sum, signal) { return sum + signal.points; }, 0);
-    var score = Math.max(0, Math.min(100, 50 + total));
+    if (!text) return { ok: false, reason: 'Nothing entered.' };
+    if (/[\u0000-\u001f]/.test(text)) return { ok: false, reason: 'Contains control characters.' };
+    var hadScheme = /^[a-z][a-z0-9+.\-]*:\/\//i.test(text);
+    var url;
+    try {
+      url = new URL(hadScheme ? text : 'https://' + text);
+    } catch (err) {
+      return { ok: false, reason: 'Not an address a browser can read.' };
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { ok: false, reason: 'Only http and https addresses are meaningful here.' };
+    }
+    var host = url.hostname.toLowerCase().replace(/\.$/, '');
     return {
-      ok: true, score: score, signals: signals, claims: extractClaims(text),
-      verdict: score >= 70 ? 'Reads like careful writing' : score >= 45 ? 'Mixed signals' : 'Reads like a forward'
+      ok: true, url: url, host: host,
+      bare: host.replace(/^www\./, ''),
+      owner: ownerOf(host),
+      secure: url.protocol === 'https:',
+      port: url.port
     };
   }
 
-  // ---------- claim extraction, ported from the original's claim extractor ----------
-  var ASSERTION_VERBS = ['is','are','was','were','has','have','had','will','can','may','causes','cause',
-    'caused','reduces','reduced','increases','increased','prevents','prevented','approved','announced',
-    'launched','banned','killed','died','won','wins','recorded','reached','contains','consists',
-    'requires','allows','prohibits','cures','treats'];
-  var SUPERLATIVES = ['first','largest','smallest','biggest','best','worst','most','least','only',
-    'never','always','all','every','none','highest','lowest','fastest','slowest','greatest'];
-  var HEDGES = ['maybe','perhaps','might','could','allegedly','reportedly','rumour','rumor'];
-
-  function factualScore(sentence) {
-    var s = String(sentence).trim();
-    var words = (s.toLowerCase().match(/[a-z']+/g) || []);
-    if (words.length < 4) return 0;
-    var score = 0;
-    if (/\d/.test(s)) score += 1.0;
-    if (/\b(1[89]\d{2}|20\d{2})\b/.test(s)) score += 0.5;
-    score += 0.6 * words.filter(function (w) { return ASSERTION_VERBS.indexOf(w) !== -1; }).length;
-    score += 0.8 * words.filter(function (w) { return SUPERLATIVES.indexOf(w) !== -1; }).length;
-    score += 0.3 * (s.match(/\b[A-Z][a-z]{2,}\b/g) || []).length;
-    if (s.indexOf('%') !== -1) score += 0.5;
-    if (words.some(function (w) { return HEDGES.indexOf(w) !== -1; })) score -= 0.5;
-    // normalise by length so long sentences do not always win
-    return Math.max(0, score / (1 + 0.05 * words.length));
+  function ownerOf(host) {
+    var labels = String(host || '').toLowerCase().split('.');
+    if (labels.length <= 2) return labels.join('.');
+    var secondLast = labels[labels.length - 2];
+    var last = labels[labels.length - 1];
+    // co.in, com.au, gov.in and friends: the owner is three labels up
+    if (last.length === 2 && COUNTRY_SECOND_LEVEL.indexOf(secondLast) !== -1 && labels.length >= 3) {
+      return labels.slice(-3).join('.');
+    }
+    return labels.slice(-2).join('.');
   }
 
-  function extractClaims(text, maxClaims, minScore) {
-    maxClaims = maxClaims || 6;
-    minScore = minScore === undefined ? 0.35 : minScore;
-    var normalised = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!normalised) return [];
-    var sentences = normalised.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map(function (s) { return s.trim(); });
-    return sentences.map(function (sentence) {
-      var score = factualScore(sentence);
-      return {
-        text: sentence, score: score, weight: Math.round(score * 100) / 100,
-        tags: [/\d/.test(sentence) ? 'figures' : null,
-               /\b(1[89]\d{2}|20\d{2})\b/.test(sentence) ? 'dated' : null,
-               /(according to|said|reported|announced|stated|published)/i.test(sentence) ? 'attributed' : null,
-               /\b(first|largest|most|only|never|always)\b/i.test(sentence) ? 'superlative' : null].filter(Boolean)
-      };
-    }).filter(function (claim) { return claim.score >= minScore; })
-      .sort(function (a, b) { return b.score - a.score; })
-      .slice(0, maxClaims);
+  function isNumericHost(host) {
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || (host.indexOf(':') !== -1 && /^[0-9a-f:\[\]]+$/.test(host));
+  }
+
+  function isLocalHost(host) {
+    var h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (h === 'localhost' || /\.(local|internal|localhost)$/.test(h)) return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
+      var p = h.split('.').map(Number);
+      if (p[0] === 10 || p[0] === 127 || p[0] === 0) return true;
+      if (p[0] === 192 && p[1] === 168) return true;
+      if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
+      if (p[0] === 169 && p[1] === 254) return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // The five questions
+  // ---------------------------------------------------------------------------
+  function readLink(raw) {
+    var parsed = parseAddress(raw);
+    if (!parsed.ok) return { ok: false, reason: parsed.reason };
+
+    var host = parsed.host, bare = parsed.bare, owner = parsed.owner;
+    var core = owner.split('.')[0];
+    var checks = [];
+
+    function record(id, question, verdict, answer) {
+      checks.push({ id: id, question: question, verdict: verdict, answer: answer });
+    }
+
+    // 1. Who owns it?
+    var legitimate = LEGITIMATE_OWNERS.indexOf(owner) !== -1;
+    var imitated = legitimate ? null : disguiseMatch(core);
+    if (imitated) {
+      record('name-honest', 'Is the name honest?', FAIL,
+        'The owner <code>' + owner + '</code> is dressed up to read as <b>' + imitated + '</b>. A digit or letter swap does not change who controls the domain.');
+    } else if (legitimate) {
+      record('name-honest', 'Is the name honest?', PASS,
+        '<code>' + owner + '</code> is the domain that name actually belongs to.');
+    } else {
+      record('name-honest', 'Is the name honest?', PASS,
+        'Nothing in <code>' + owner + '</code> imitates a name people log into.');
+    }
+
+    // 2. Is the transport encrypted?
+    if (!parsed.secure) {
+      record('transport', 'Is the connection encrypted?', FAIL,
+        'Plain <code>http</code>. Anything typed on the page can be read or changed in transit.');
+    } else {
+      record('transport', 'Is the connection encrypted?', PASS,
+        '<code>https</code>. This says the connection is private, not that the owner is honest.');
+    }
+
+    // 3. Does it go where it appears to go?
+    var detours = [];
+    if (SHORTENING_SERVICES.indexOf(bare) !== -1) detours.push('a shortening service, so the real destination is hidden');
+    if (/[?&](url|redirect|next|target|dest|goto|r|continue)=/i.test(parsed.url.search)) detours.push('a destination carried in the query string');
+    if (isNumericHost(host)) detours.push('a raw numeric address rather than a name');
+    if (detours.length) {
+      record('direct', 'Does the address go where it appears to?', FAIL,
+        'It is ' + detours.join(', and ') + '.');
+    } else {
+      record('direct', 'Does the address go where it appears to?', PASS,
+        'The address names its own destination directly.');
+    }
+
+    // 4. Is it a real public site?
+    if (isLocalHost(host)) {
+      record('reachable', 'Is it a public site?', FAIL,
+        '<code>' + host + '</code> is a private or loopback address. No message should ever send you to one.');
+    } else if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+      record('reachable', 'Is it a public site?', WARN,
+        'Uses port <code>' + parsed.port + '</code>, which ordinary websites do not.');
+    } else {
+      record('reachable', 'Is it a public site?', PASS, 'A normal public address on a standard port.');
+    }
+
+    // 5. Is anything disguised in the text of the address?
+    var oddities = [];
+    if (host.indexOf('xn--') === 0 || host.indexOf('.xn--') !== -1) oddities.push('punycode, which can render as a lookalike name');
+    if (parsed.url.username || parsed.url.password) oddities.push('credentials written before the host');
+    var encoded = (parsed.url.search.match(/%[0-9a-f]{2}/gi) || []).length;
+    if (encoded > 5) oddities.push(encoded + ' percent-encoded sequences');
+    if (bare.split('.').length > 4) oddities.push(bare.split('.').length + ' subdomain levels');
+    if (parsed.url.href.length > 120) oddities.push('a ' + parsed.url.href.length + '-character address');
+    if (oddities.length) {
+      record('clean', 'Is the address itself clean?', WARN, 'Contains ' + oddities.join(', ') + '.');
+    } else {
+      record('clean', 'Is the address itself clean?', PASS, 'No punycode, no embedded credentials, no padding.');
+    }
+
+    var failed = checks.filter(function (c) { return c.verdict === FAIL; });
+    var warned = checks.filter(function (c) { return c.verdict === WARN; });
+    var criticalFail = failed.some(function (c) { return c.id === 'name-honest' || c.id === 'reachable'; });
+
+    var headline, tone;
+    if (criticalFail || failed.length >= 2) {
+      headline = 'Do not trust this address'; tone = FAIL;
+    } else if (failed.length === 1 || warned.length >= 2) {
+      headline = 'Treat it with suspicion'; tone = WARN;
+    } else if (warned.length === 1) {
+      headline = 'Probably fine, one oddity'; tone = WARN;
+    } else {
+      headline = 'Nothing wrong with the address itself'; tone = PASS;
+    }
+
+    return { ok: true, checks: checks, headline: headline, tone: tone,
+             owner: owner, host: bare, failed: failed.length, warned: warned.length };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Claim evidence: for each assertion, name the evidence attached to it.
+  // ---------------------------------------------------------------------------
+  var ASSERTION_MARKERS = /\b(is|are|was|were|has|have|had|will|would|can|could|must|shows?|proves?|confirms?|reveals?|causes?|caused|leads?|reduces?|increases?|bans?|banned|announced|approved|launched|recorded|reported|died|killed|won|lost|reached|contains?|requires?|allows?|treats?|cures?)\b/i;
+
+  var SOURCE_MARKERS = /\b(according to|as reported by|said in a statement|told (reporters|the court|the paper)|spokesperson|press release|white paper|peer[- ]reviewed|published in|the (ministry|department|court|commission|authority|bureau|board) of|the government of)\b/i;
+  var DOCUMENT_MARKERS = /(https?:\/\/\S+|\b(doc|document|report|circular|notification|order|gazette|filing|transcript)\b)/i;
+  var QUOTE_MARKERS = /("[^"]{12,}"|\u201c[^\u201d]{12,}\u201d)/;
+  var HEDGE_MARKERS = /\b(may|might|could|possibly|preliminary|unconfirmed|alleged|allegedly|reportedly|appears? to|suggests?|estimated|about|roughly)\b/i;
+  var ABSOLUTE_MARKERS = /\b(always|never|everyone|nobody|no one|all|none|guaranteed|proven|undeniable|obviously|clearly|certainly|100%)\b/i;
+
+  function classifyEvidence(sentence) {
+    if (SOURCE_MARKERS.test(sentence)) return 'named';
+    if (DOCUMENT_MARKERS.test(sentence) && /(https?:\/\/|\.pdf|report|circular|notification|order|gazette|filing)/i.test(sentence)) return 'doc';
+    if (QUOTE_MARKERS.test(sentence)) return 'quote';
+    if (/\d/.test(sentence)) return 'figures';
+    return 'none';
+  }
+
+  var EVIDENCE_LABEL = {
+    doc: 'linked document',
+    named: 'named source',
+    quote: 'direct quote',
+    figures: 'figures only',
+    none: 'nothing offered'
+  };
+
+  function readText(raw) {
+    var text = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!text) return { ok: false, reason: 'Nothing entered.' };
+
+    var sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/).map(function (s) { return s.trim(); });
+    var claims = [];
+
+    sentences.forEach(function (sentence) {
+      if (sentence.split(/\s+/).length < 5) return;
+      if (!ASSERTION_MARKERS.test(sentence)) return;
+      claims.push({
+        text: sentence,
+        evidence: classifyEvidence(sentence),
+        hedged: HEDGE_MARKERS.test(sentence),
+        absolute: ABSOLUTE_MARKERS.test(sentence),
+        specific: /\d/.test(sentence) || /\b(1[89]\d{2}|20\d{2})\b/.test(sentence)
+      });
+    });
+
+    var counts = { doc: 0, named: 0, quote: 0, figures: 0, none: 0 };
+    claims.forEach(function (claim) { counts[claim.evidence]++; });
+
+    var supported = counts.doc + counts.named + counts.quote;
+    var absolutes = claims.filter(function (c) { return c.absolute; }).length;
+    var hedged = claims.filter(function (c) { return c.hedged; }).length;
+
+    var headline, tone;
+    if (!claims.length) {
+      headline = 'Nothing here asserts a fact'; tone = WARN;
+    } else if (counts.none === claims.length) {
+      headline = 'Every claim is unsourced'; tone = FAIL;
+    } else if (supported === 0) {
+      headline = 'Figures with no source behind them'; tone = FAIL;
+    } else if (supported >= Math.ceil(claims.length / 2)) {
+      headline = 'Most claims name where they came from'; tone = PASS;
+    } else {
+      headline = 'Some claims are sourced, some are not'; tone = WARN;
+    }
+
+    if (absolutes && tone === PASS) { headline = 'Sourced, but written in absolutes'; tone = WARN; }
+
+    return {
+      ok: true, claims: claims, counts: counts, headline: headline, tone: tone,
+      supported: supported, absolutes: absolutes, hedged: hedged, total: claims.length
+    };
   }
   // CORE>>
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { analyseUrl: analyseUrl, scoreText: scoreText, extractClaims: extractClaims,
-      parseUrl: parseUrl, band: band, URL_WEIGHTS: URL_WEIGHTS, TEXT_SIGNALS: TEXT_SIGNALS,
-      registrableDomain: registrableDomain, lookalikeBrand: lookalikeBrand, levenshtein: levenshtein,
-      isPrivateHost: isPrivateHost, factualScore: factualScore };
+    module.exports = { readLink: readLink, readText: readText, parseAddress: parseAddress,
+      ownerOf: ownerOf, skeleton: skeleton, looksDisguised: looksDisguised, disguiseMatch: disguiseMatch,
+      classifyEvidence: classifyEvidence, isLocalHost: isLocalHost, isNumericHost: isNumericHost };
   }
 
   /* ================= UI ================= */
   var $ = function (id) { return document.getElementById(id); };
-  var CIRC = 283;
 
   var tabs = [['t-link', 'p-link'], ['t-text', 'p-text']];
   tabs.forEach(function (pair) {
@@ -553,142 +519,106 @@
     });
   });
 
-  function colourFor(score) {
-    return score <= 34 ? 'var(--bad)' : score <= 59 ? 'var(--warn)' : score <= 79 ? 'var(--warn)' : 'var(--good)';
-  }
-
-  function renderSignals(holder, signals) {
-    holder.innerHTML = '';
-    if (!signals.length) {
-      var none = document.createElement('div');
-      none.className = 'empty';
-      none.textContent = 'No signals triggered. That means nothing in the structure looked wrong — not that the destination is safe.';
-      holder.appendChild(none);
-      return;
-    }
-    signals.forEach(function (signal) {
-      var row = document.createElement('div');
-      row.className = 'sig';
-      var cls = signal.points > 0 ? 'pos' : signal.points < 0 ? 'neg' : 'zero';
-      var sign = signal.points > 0 ? '+' : '';
-      row.innerHTML = '<div class="sig__pts ' + cls + '">' + sign + signal.points + '</div>' +
-        '<div><div class="sig__id">' + signal.id + '</div>' +
-        '<div class="sig__why">' + escapeHtml(signal.why) + '</div>' +
-        (signal.hit ? '<div class="sig__hit">' + escapeHtml(String(signal.hit)) + '</div>' : '') + '</div>' +
-        '<div></div>';
-      holder.appendChild(row);
-    });
-  }
-
   function escapeHtml(text) {
     return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function runUrl() {
-    var result = analyseUrl($('url').value);
-    var box = $('url-result');
+  var MARK = { pass: '✓', warn: '!', fail: '✕' };
+
+  function runLink() {
+    var result = readLink($('url').value);
+    var card = $('url-card');
+    card.classList.add('on');
+
     if (!result.ok) {
-      box.classList.add('on');
-      $('url-score').textContent = '—';
-      $('url-verdict').textContent = 'Cannot read that as a link';
-      $('url-sub').textContent = result.error;
-      $('url-signals').innerHTML = '';
-      $('url-maths').textContent = '';
+      $('url-headline').textContent = 'Cannot read that';
+      $('url-headline').className = 'headline warn';
+      $('url-sub').textContent = result.reason;
+      $('url-checks').innerHTML = '';
       return;
     }
-    box.classList.add('on');
-    $('url-score').textContent = result.score;
-    $('url-verdict').textContent = result.verdict;
-    $('url-verdict').style.color = colourFor(result.score);
-    $('url-sub').innerHTML = 'band <code>' + result.band + '</code> · host <code>' + escapeHtml(result.host) + '</code>';
-    var arc = $('url-arc');
-    arc.setAttribute('stroke', colourFor(result.score));
-    arc.setAttribute('stroke-dashoffset', String(CIRC - CIRC * result.score / 100));
-    renderSignals($('url-signals'), result.signals);
-    if (result.advisories && result.advisories.length) {
-      var adv = document.createElement('div');
-      adv.className = 'sig';
-      adv.innerHTML = '<div class="sig__pts zero">note</div><div><div class="sig__id">advisory</div>' +
-        '<div class="sig__why">' + escapeHtml(result.advisories.join(' ')) + '</div></div><div></div>';
-      $('url-signals').appendChild(adv);
-    }
-    var pos = result.signals.filter(function (s) { return s.points > 0; }).reduce(function (a, s) { return a + s.points; }, 0);
-    var neg = result.signals.filter(function (s) { return s.points < 0; }).reduce(function (a, s) { return a + s.points; }, 0);
-    $('url-maths').textContent = 'risk = 35 baseline ' + (pos ? '+ ' + pos + ' ' : '') + (neg ? '− ' + Math.abs(neg) + ' ' : '') +
-      '= ' + result.risk + '   →   score = 100 − ' + result.risk + ' = ' + result.score;
+
+    $('url-headline').textContent = result.headline;
+    $('url-headline').className = 'headline ' + result.tone;
+    $('url-sub').innerHTML = 'owner <code>' + escapeHtml(result.owner) + '</code> · ' +
+      result.checks.length + ' questions · ' + result.failed + ' failed, ' + result.warned + ' to check';
+
+    var holder = $('url-checks');
+    holder.innerHTML = '';
+    result.checks.forEach(function (check) {
+      var row = document.createElement('div');
+      row.className = 'check';
+      row.innerHTML = '<div class="mark ' + check.verdict + '">' + MARK[check.verdict] + '</div>' +
+        '<div><div class="q">' + escapeHtml(check.question) + '</div>' +
+        '<div class="a">' + check.answer + '</div></div>';
+      holder.appendChild(row);
+    });
   }
 
   function runText() {
-    var result = scoreText($('text').value);
-    var box = $('text-result');
-    var claimsBox = $('claims');
+    var result = readText($('text').value);
+    var card = $('text-card');
+    card.classList.add('on');
+
     if (!result.ok) {
-      box.classList.remove('on');
-      claimsBox.classList.remove('on');
+      $('text-headline').textContent = 'Nothing to read';
+      $('text-headline').className = 'headline warn';
+      $('text-sub').textContent = result.reason;
+      $('claim-body').innerHTML = '';
+      $('tally').innerHTML = '';
       return;
     }
-    box.classList.add('on');
-    $('text-score').textContent = result.score;
-    $('text-verdict').textContent = result.verdict;
-    $('text-verdict').style.color = colourFor(result.score);
-    $('text-sub').textContent = result.signals.length + ' signal' + (result.signals.length === 1 ? '' : 's') +
-      ' · ' + result.claims.length + ' checkable sentence' + (result.claims.length === 1 ? '' : 's');
-    var arc = $('text-arc');
-    arc.setAttribute('stroke', colourFor(result.score));
-    arc.setAttribute('stroke-dashoffset', String(CIRC - CIRC * result.score / 100));
-    renderSignals($('text-signals'), result.signals);
-    var sum = result.signals.reduce(function (a, s) { return a + s.points; }, 0);
-    $('text-maths').textContent = 'score = 50 baseline ' + (sum ? (sum > 0 ? '+ ' + sum : '− ' + Math.abs(sum)) : '+ 0') +
-      ' = ' + result.score + '   (50 = no signals either way)';
 
-    if (result.claims.length) {
-      claimsBox.classList.add('on');
-      var list = $('claimlist');
-      list.innerHTML = '';
-      result.claims.forEach(function (claim) {
-        var row = document.createElement('div');
-        row.className = 'claim';
-        row.innerHTML = '<div><div class="claim__text">' + escapeHtml(claim.text) + '</div>' +
-          (claim.tags.length ? '<div class="claim__tags">' + claim.tags.join(' · ') + '</div>' : '') + '</div>' +
-          '<div class="claim__score">score ' + claim.weight + '</div>';
-        list.appendChild(row);
-      });
-    } else {
-      claimsBox.classList.remove('on');
+    $('text-headline').textContent = result.headline;
+    $('text-headline').className = 'headline ' + result.tone;
+    $('text-sub').textContent = result.total + ' assertion' + (result.total === 1 ? '' : 's') +
+      ' · ' + result.supported + ' with a source attached';
+
+    var body = $('claim-body');
+    body.innerHTML = '';
+    if (!result.claims.length) {
+      body.innerHTML = '<tr><td colspan="2" class="empty">No sentence here asserts anything checkable — it reads as opinion or filler.</td></tr>';
     }
+    result.claims.forEach(function (claim) {
+      var row = document.createElement('tr');
+      row.innerHTML = '<td>' + escapeHtml(claim.text) + '</td>' +
+        '<td><span class="evidence ' + claim.evidence + '">' + EVIDENCE_LABEL[claim.evidence] + '</span></td>';
+      body.appendChild(row);
+    });
+
+    var parts = ['<span>sourced: <b>' + result.supported + '</b></span>',
+                 '<span>unsourced: <b>' + result.counts.none + '</b></span>',
+                 '<span>figures only: <b>' + result.counts.figures + '</b></span>',
+                 '<span>hedged: <b>' + result.hedged + '</b></span>',
+                 '<span>absolutes: <b>' + result.absolutes + '</b></span>'];
+    $('tally').innerHTML = parts.join('');
   }
 
-  var SAMPLES = {
+  var LINKS = {
+    typo: 'http://paypa1-secure.com/verify?session=9f2a',
     short: 'https://bit.ly/3xK9pQz',
-    lookalike: 'http://sbi-kyc-verify.xyz/login?redirect=https%3A%2F%2Fevil.example',
-    clean: 'https://github.com/QuantumCoder-14/scamcheck'
+    real: 'https://github.com/QuantumCoder-14/claimcheck'
   };
-  var TEXT_SAMPLES = {
-    sensational: 'SHOCKING: everyone knows the mainstream media won\'t tell you this. Sources say a secret report proves 100% that the new rule is a cover-up. Forward this to all your contacts before it is deleted!!!',
-    sober: 'The ministry of health said in a statement on Tuesday that 1,240 cases were reported in 2024, and that the figures are preliminary. "We could not be independently verified at the time of reporting," a spokesperson said.'
+  var TEXTS = {
+    forward: 'SHOCKING: everyone knows the banks are hiding this. Sources say the new rule will take every account. Forward this to all your contacts before it is deleted!!!',
+    report: 'The ministry of health said in a statement on Tuesday that 1,240 cases were recorded in 2024. "The figures are preliminary and may be revised," a spokesperson told reporters. A notification published on the ministry website sets out the reporting rules.'
   };
 
   document.querySelectorAll('[data-sample]').forEach(function (button) {
     button.addEventListener('click', function () {
       var key = button.getAttribute('data-sample');
-      if (SAMPLES[key]) { $('url').value = SAMPLES[key]; runUrl(); }
-      if (TEXT_SAMPLES[key]) { $('text').value = TEXT_SAMPLES[key]; runText(); }
+      if (LINKS[key]) { $('url').value = LINKS[key]; runLink(); }
+      if (TEXTS[key]) { $('text').value = TEXTS[key]; runText(); }
     });
   });
 
-  $('check-url').addEventListener('click', runUrl);
+  $('check-url').addEventListener('click', runLink);
   $('check-text').addEventListener('click', runText);
-  $('url').addEventListener('keydown', function (event) { if (event.key === 'Enter') runUrl(); });
+  $('url').addEventListener('keydown', function (event) { if (event.key === 'Enter') runLink(); });
 
   var timer = null;
-  $('text').addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(runText, 260);
-  });
-  $('url').addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(runUrl, 260);
-  });
+  $('url').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(runLink, 260); });
+  $('text').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(runText, 260); });
 })();
 </script>
 </body>
