@@ -3,7 +3,7 @@ const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const m = html.match(/\/\/ <<CORE([\s\S]*?)\/\/ CORE>>/);
 if (!m) { console.error('CORE block not found'); process.exit(1); }
-const api = new Function(m[1] + '; return {analyseUrl, scoreText, extractClaims, parseUrl, band, URL_WEIGHTS};')();
+const api = new Function(m[1] + '; return {analyseUrl, scoreText, extractClaims, parseUrl, band, URL_WEIGHTS, registrableDomain, lookalikeBrand, levenshtein, isPrivateHost, factualScore};')();
 let fails = 0;
 const eq = (n, got, want) => { if (JSON.stringify(got) !== JSON.stringify(want)) {
   fails++; console.log(`FAIL ${n}\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); } };
@@ -61,11 +61,32 @@ ok('score stays in range', api.scoreText('x'.repeat(50)).score >= 0 && api.score
 // ---------- claim extraction ----------
 const claims = api.extractClaims('In 2024 the ministry reported 1,240 cases. The sky is blue. A spokesperson said the figure was preliminary and may rise.');
 ok('extracts checkable sentences', claims.length >= 2, 'got ' + claims.length);
-ok('drops short fragments', claims.every(c => c.text.length > 25));
+ok('drops sentences under four words', claims.every(c => c.text.split(/\s+/).length >= 4));
 ok('tags dated claims', claims.some(c => c.tags.includes('dated')));
 ok('tags attributed claims', claims.some(c => c.tags.includes('attributed')));
 ok('sorted by weight', claims.every((c, i, a) => i === 0 || a[i - 1].weight >= c.weight));
 eq('opinion-only text yields no claims', api.extractClaims('We should probably think about it more.').length, 0);
+
+// ---------- ported analyser internals ----------
+eq('registrable domain', api.registrableDomain('login.sbi.co.in'), 'sbi.co.in');
+eq('registrable domain simple', api.registrableDomain('a.b.example.com'), 'example.com');
+eq('levenshtein identical', api.levenshtein('google', 'google'), 0);
+eq('levenshtein one edit', api.levenshtein('gooogle', 'google'), 1);
+eq('typosquat detected', api.lookalikeBrand('gooogle.com', 'gooogle.com'), 'google');
+eq('brand substring detected', api.lookalikeBrand('paypal-secure.com', 'paypal-secure.com'), 'paypal');
+eq('brand in subdomain detected', api.lookalikeBrand('paypal.evil.com', 'evil.com'), 'paypal');
+eq('real brand domain not flagged', api.lookalikeBrand('google.com', 'google.com'), null);
+eq('private host loopback', api.isPrivateHost('127.0.0.1'), true);
+eq('private host rfc1918', api.isPrivateHost('192.168.1.5'), true);
+eq('private host metadata', api.isPrivateHost('169.254.169.254'), true);
+eq('public host not private', api.isPrivateHost('example.com'), false);
+ok('typosquat link scores worse', api.analyseUrl('https://gooogle.com').score < api.analyseUrl('https://example.com').score);
+eq('long url threshold is 120', api.analyseUrl('https://example.com/' + 'a'.repeat(100)).signals.some(s => s.id === 'url.long_url'), false);
+eq('over 120 triggers long url', api.analyseUrl('https://example.com/' + 'a'.repeat(120)).signals.some(s => s.id === 'url.long_url'), true);
+eq('advisory for private host', api.analyseUrl('http://192.168.0.1/admin').advisories.length, 1);
+ok('factual score rewards numbers', api.factualScore('The ministry recorded 1,240 cases in 2024.') > api.factualScore('Things happened recently at some point.'));
+ok('factual score penalises hedging', api.factualScore('The report maybe was perhaps wrong.') < api.factualScore('The report recorded 1,240 cases.'));
+ok('claims capped at six', api.extractClaims('The ministry recorded 1,240 cases in 2024. '.repeat(10)).length <= 6);
 
 // ---------- determinism ----------
 const a1 = JSON.stringify(api.analyseUrl('https://sbi-kyc-verify.xyz/x'));
