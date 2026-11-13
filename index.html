@@ -3,206 +3,149 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClaimCheck — what a link really is, and what evidence a claim offers</title>
-<meta name="description" content="Read a link's identity and a text's evidence in your browser: who owns the domain, whether the name is honest, and which claims come with a source. Nothing uploaded.">
+<title>ClaimCheck — a reading of the address, and of the evidence</title>
+<meta name="description" content="A short report on any link, and on any claim: who owns the address, whether the name is honest, and what evidence each assertion carries. Nothing leaves the page.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1720; --bg2:#141f2b; --panel:#18242f;
-    --grid:rgba(120,170,220,0.055);
-    --line:rgba(140,190,235,0.20); --line-soft:rgba(140,190,235,0.10);
-    --ink:#dce8f2; --dim:#8fa8bd; --faint:#5f7789;
-    --pass:#57d39b; --warn:#e8b84b; --fail:#f0796b;
-    --accent:#7cc4ff;
-    --sans:'Archivo',system-ui,sans-serif;
-    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --paper:#fbf8f1; --ink:#221f1a; --soft:#4d473d; --muted:#857e70;
+    --rule:#d9d2c4; --rule-soft:#e8e2d6;
+    --ok:#2f6b45; --warn:#8a5f14; --bad:#a33224;
     --serif:'Source Serif 4',Georgia,serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
   }
-  @media (prefers-color-scheme: light){
+  @media (prefers-color-scheme: dark){
     :root{
-      --bg:#eef3f8; --bg2:#f7fafc; --panel:#fff;
-      --grid:rgba(20,60,110,0.05);
-      --line:rgba(20,60,110,0.22); --line-soft:rgba(20,60,110,0.10);
-      --ink:#11202e; --dim:#4a6178; --faint:#7d92a5;
-      --pass:#127a52; --warn:#8a6100; --fail:#a8342a;
-      --accent:#0b5fa5;
+      --paper:#14120f; --ink:#eee9df; --soft:#c3bcae; --muted:#8d867a;
+      --rule:#332f28; --rule-soft:#26221d;
+      --ok:#8fc9a3; --warn:#dcb062; --bad:#e8907e;
     }
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    background-color:var(--bg);
-    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-    background-size:28px 28px;
-    color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.62;-webkit-font-smoothing:antialiased;
-  }
-  a{color:var(--accent)}
-  .wrap{max-width:1000px;margin:0 auto;padding:0 22px}
-  header{padding:30px 0 20px;border-bottom:1px solid var(--line-soft)}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
-  h1{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-.03em;line-height:1.05}
-  h1 span{color:var(--accent)}
-  .tag{color:var(--dim);font-size:14px;margin-top:7px;max-width:58ch}
-  .badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);
-    border:1px solid var(--line);padding:5px 11px;white-space:nowrap}
-  nav{display:flex;border-bottom:1px solid var(--line-soft);margin-top:22px}
-  nav button{appearance:none;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
-    font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
-    padding:11px 18px 9px}
-  nav button:hover{color:var(--ink)}
-  nav button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
-  main{padding:24px 0 56px}
-  .pane{display:none}.pane.on{display:block}
-  label{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:6px}
-  input[type=text],textarea{width:100%;background:var(--bg2);color:var(--ink);border:1px solid var(--line);
-    border-radius:4px;padding:11px 13px;font-family:var(--mono);font-size:13px;line-height:1.6}
-  textarea{min-height:150px;resize:vertical}
-  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:11px}
-  button.act{appearance:none;cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--dim);
-    background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:8px 14px}
-  button.act:hover{border-color:var(--accent);color:var(--accent)}
-  button.act.primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:500}
-  button.act.primary:hover{filter:brightness(1.08);color:var(--bg)}
+  body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.68;
+    -webkit-font-smoothing:antialiased}
+  .sheet{max-width:720px;margin:0 auto;padding:56px 26px 90px}
+  a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule)}
 
-  .card{margin-top:20px;border:1px solid var(--line);background:var(--panel);border-radius:4px;overflow:hidden;display:none}
-  .card.on{display:block}
-  .card__head{padding:16px 20px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;
-    gap:14px;align-items:center;flex-wrap:wrap}
-  .headline{font-size:19px;font-weight:600;letter-spacing:-.01em}
-  .headline.pass{color:var(--pass)}.headline.warn{color:var(--warn)}.headline.fail{color:var(--fail)}
-  .sub{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
-  .sub code{background:var(--bg2);padding:1px 5px;border-radius:2px;color:var(--dim)}
+  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:34px}
+  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  h1{font-size:34px;font-weight:600;letter-spacing:-.015em;line-height:1.12}
+  .standfirst{color:var(--soft);font-size:16px;margin-top:10px;max-width:56ch}
 
-  .check{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:13px 20px;border-bottom:1px solid var(--line-soft)}
-  .check:last-child{border-bottom:none}
-  .mark{font-family:var(--mono);font-size:12px;width:20px;height:20px;display:flex;align-items:center;
-    justify-content:center;border-radius:50%;margin-top:2px;flex:none}
-  .mark.pass{background:rgba(87,211,155,0.14);color:var(--pass)}
-  .mark.warn{background:rgba(232,184,75,0.14);color:var(--warn)}
-  .mark.fail{background:rgba(240,121,107,0.14);color:var(--fail)}
-  .q{font-weight:600;font-size:14px}
-  .a{font-size:13px;color:var(--dim);margin-top:2px}
-  .a code{font-family:var(--mono);font-size:11.5px;background:var(--bg2);padding:1px 5px;border-radius:2px;color:var(--ink)}
+  .part{margin:44px 0 0}
+  .part__num{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h2{font-size:23px;font-weight:600;letter-spacing:-.01em;margin:6px 0 4px}
+  .hint{color:var(--muted);font-size:14px;margin-bottom:16px}
 
-  .claims{width:100%;border-collapse:collapse;font-size:13.5px}
-  .claims th{text-align:left;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
-    color:var(--faint);padding:9px 20px;border-bottom:1px solid var(--line-soft);font-weight:500}
-  .claims td{padding:11px 20px;border-bottom:1px solid var(--line-soft);vertical-align:top}
-  .claims tr:last-child td{border-bottom:none}
-  .claims td:first-child{font-family:var(--serif);line-height:1.45;max-width:62ch}
-  .evidence{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:3px;white-space:nowrap}
-  .evidence.doc{background:rgba(87,211,155,0.14);color:var(--pass)}
-  .evidence.named{background:rgba(124,196,255,0.14);color:var(--accent)}
-  .evidence.quote{background:rgba(124,196,255,0.10);color:var(--accent)}
-  .evidence.figures{background:rgba(232,184,75,0.14);color:var(--warn)}
-  .evidence.none{background:rgba(240,121,107,0.12);color:var(--fail)}
-  .tally{display:flex;gap:18px;flex-wrap:wrap;padding:14px 20px;background:var(--bg2);border-top:1px solid var(--line-soft);
-    font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  input[type=text],textarea{width:100%;background:transparent;color:var(--ink);border:none;
+    border-bottom:1px solid var(--rule);padding:9px 0;font-family:var(--mono);font-size:13.5px;line-height:1.7}
+  textarea{border:1px solid var(--rule);padding:12px;min-height:132px;resize:vertical}
+  input:focus,textarea:focus{outline:none;border-bottom-color:var(--ink);border-color:var(--ink)}
+  .samples{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-family:var(--mono);font-size:11px}
+  .samples button{appearance:none;background:none;border:none;border-bottom:1px dotted var(--rule);
+    color:var(--muted);cursor:pointer;font-family:inherit;font-size:inherit;padding:2px 0}
+  .samples button:hover{color:var(--ink);border-bottom-color:var(--ink)}
+
+  .report{margin-top:26px;padding-top:20px;border-top:1px solid var(--rule);display:none}
+  .report.on{display:block}
+  .verdict{font-size:21px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px}
+  .verdict.ok{color:var(--ok)}.verdict.warn{color:var(--warn)}.verdict.bad{color:var(--bad)}
+  .byline{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+
+  dl{margin:18px 0 0}
+  .q{padding:13px 0;border-bottom:1px solid var(--rule-soft)}
+  .q:last-child{border-bottom:none}
+  .q dt{font-weight:600;font-size:15.5px;display:flex;gap:9px;align-items:baseline}
+  .q dt .g{font-family:var(--mono);font-size:12px;width:14px;flex:none}
+  .q dt .g.ok{color:var(--ok)}.q dt .g.warn{color:var(--warn)}.q dt .g.bad{color:var(--bad)}
+  .q dd{color:var(--soft);font-size:14.5px;margin:4px 0 0 23px;line-height:1.6}
+  .q dd code{font-family:var(--mono);font-size:12.5px;background:var(--rule-soft);padding:1px 4px}
+
+  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14.5px}
+  th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);font-weight:400;padding:0 0 8px;border-bottom:1px solid var(--ink)}
+  td{padding:11px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--soft)}
+  td:first-child{color:var(--ink);padding-right:18px}
+  td:last-child{text-align:right;white-space:nowrap;font-family:var(--mono);font-size:11px}
+  .ev{letter-spacing:.04em}
+  .ev.doc,.ev.named{color:var(--ok)}
+  .ev.quote{color:var(--soft)}
+  .ev.figures{color:var(--warn)}
+  .ev.none{color:var(--bad)}
+  .tally{margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2}
   .tally b{color:var(--ink);font-weight:500}
-  .empty{padding:20px;color:var(--dim);font-size:13.5px}
-  .note{font-size:12.5px;color:var(--faint);margin-top:14px;line-height:1.6;max-width:74ch}
-  .disclaimer{margin-top:22px;padding:13px 16px;border-left:2px solid var(--warn);background:rgba(232,184,75,0.07);
-    font-size:12.5px;color:var(--dim);border-radius:0 3px 3px 0}
-  footer{border-top:1px solid var(--line-soft);padding:20px 0 36px}
-  .foot{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--faint)}
-  .foot a{color:var(--dim);text-decoration:none;border-bottom:1px dotted var(--line)}
-  .foot a:hover{color:var(--accent)}
+
+  .colophon{margin-top:56px;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--mono);
+    font-size:11px;color:var(--muted);line-height:1.9}
+  .colophon a{border-bottom:1px dotted var(--rule)}
+  .caveat{color:var(--soft);font-size:14px;font-style:italic;margin-top:14px;max-width:60ch}
 </style>
 </head>
 <body>
+<div class="sheet">
 
-<header>
-  <div class="wrap">
-    <div class="top">
-      <div>
-        <h1>ClaimCheck<span>.</span></h1>
-        <p class="tag">Two questions, answered plainly: what is this link actually pointing at, and what evidence does this claim come with?</p>
-      </div>
-      <span class="badge">nothing uploaded</span>
+  <header>
+    <div class="kicker">ClaimCheck · a reading, not a score</div>
+    <h1>What the address is, and what the claim rests on</h1>
+    <p class="standfirst">Paste a link to have its identity read out, or paste a text to see which of its assertions carry a source. Both readings happen on this page and go no further.</p>
+  </header>
+
+  <section class="part">
+    <div class="part__num">Part one</div>
+    <h2>The address</h2>
+    <p class="hint">Five questions. Each answered plainly, with the reason beside it.</p>
+    <label for="url">Address</label>
+    <input type="text" id="url" spellcheck="false" placeholder="https://example.com/page">
+    <div class="samples">
+      <button data-sample="typo">a disguised name</button>
+      <button data-sample="short">a shortened link</button>
+      <button data-sample="real">an ordinary link</button>
     </div>
-    <nav role="tablist">
-      <button role="tab" id="t-link" aria-selected="true" aria-controls="p-link">Link identity</button>
-      <button role="tab" id="t-text" aria-selected="false" aria-controls="p-text">Claim evidence</button>
-    </nav>
-  </div>
-</header>
 
-<main>
-  <div class="wrap">
-
-    <section class="pane on" id="p-link" role="tabpanel" aria-labelledby="t-link">
-      <label for="url">A link, as you received it</label>
-      <input type="text" id="url" spellcheck="false" placeholder="https://example.com/page?x=1">
-      <div class="row">
-        <button class="act primary" id="check-url">Read the link</button>
-        <button class="act" data-sample="typo">sample: paypa1-secure</button>
-        <button class="act" data-sample="short">sample: shortened</button>
-        <button class="act" data-sample="real">sample: ordinary</button>
-      </div>
-
-      <div class="card" id="url-card">
-        <div class="card__head">
-          <div>
-            <div class="headline" id="url-headline">—</div>
-            <div class="sub" id="url-sub">—</div>
-          </div>
-        </div>
-        <div id="url-checks"></div>
-      </div>
-    </section>
-
-    <section class="pane" id="p-text" role="tabpanel" aria-labelledby="t-text">
-      <label for="text">The text you were sent</label>
-      <textarea id="text" spellcheck="false" placeholder="Paste the message, forward, or a paragraph of an article."></textarea>
-      <div class="row">
-        <button class="act primary" id="check-text">Read the claims</button>
-        <button class="act" data-sample="forward">sample: a forward</button>
-        <button class="act" data-sample="report">sample: a report</button>
-      </div>
-
-      <div class="card" id="text-card">
-        <div class="card__head">
-          <div>
-            <div class="headline" id="text-headline">—</div>
-            <div class="sub" id="text-sub">—</div>
-          </div>
-        </div>
-        <table class="claims" id="claim-table">
-          <thead><tr><th>What it asserts</th><th>Evidence offered</th></tr></thead>
-          <tbody id="claim-body"></tbody>
-        </table>
-        <div class="tally" id="tally"></div>
-      </div>
-    </section>
-
-    <p class="disclaimer">
-      This tells you what a link is made of and what a claim is backed by. It cannot tell you
-      whether the claim is true — only whether anyone is named who could be checked.
-    </p>
-    <p class="note">
-      No score to trust and no model to take on faith: every answer here is a question with a
-      yes, a no, or a "can't tell from the text", and the reasoning sits next to it.
-    </p>
-
-  </div>
-</main>
-
-<footer>
-  <div class="wrap">
-    <div class="foot">
-      <span>Built by <a href="https://github.com/QuantumCoder-14">Siddhant Neekhra</a> · MIT with Commons Clause</span>
-      <span><a href="https://quantumcoder-14.github.io/">more tools</a></span>
+    <div class="report" id="url-report">
+      <div class="verdict" id="url-verdict">—</div>
+      <div class="byline" id="url-byline">—</div>
+      <dl id="url-list"></dl>
     </div>
+  </section>
+
+  <section class="part">
+    <div class="part__num">Part two</div>
+    <h2>The claims</h2>
+    <p class="hint">Every sentence that asserts something, and what is offered in support of it.</p>
+    <label for="text">Text</label>
+    <textarea id="text" spellcheck="false" placeholder="Paste the message or the paragraph."></textarea>
+    <div class="samples">
+      <button data-sample="forward">a forward</button>
+      <button data-sample="report">a report</button>
+    </div>
+
+    <div class="report" id="text-report">
+      <div class="verdict" id="text-verdict">—</div>
+      <div class="byline" id="text-byline">—</div>
+      <table>
+        <thead><tr><th>Assertion</th><th>Support</th></tr></thead>
+        <tbody id="claim-body"></tbody>
+      </table>
+      <div class="tally" id="tally"></div>
+    </div>
+  </section>
+
+  <div class="colophon">
+    <div>Written by <a href="https://github.com/QuantumCoder-14">Siddhant Neekhra</a> · MIT with Commons Clause</div>
+    <div><a href="https://quantumcoder-14.github.io/">Other tools</a></div>
+    <p class="caveat">This reads the address and the evidence, not the truth. A clean address can still host a swindle, and a sourced claim can still be wrong.</p>
   </div>
-</footer>
+
+</div>
 
 <script>
 (function () {
   'use strict';
 
-  /* ================= CORE (tested separately) ================= */
   // <<CORE
   // ---------------------------------------------------------------------------
   // Design: this asks five questions about a link and answers each one with a
@@ -505,93 +448,69 @@
       classifyEvidence: classifyEvidence, isLocalHost: isLocalHost, isNumericHost: isNumericHost };
   }
 
-  /* ================= UI ================= */
+  /* ---------------- rendering ---------------- */
   var $ = function (id) { return document.getElementById(id); };
-
-  var tabs = [['t-link', 'p-link'], ['t-text', 'p-text']];
-  tabs.forEach(function (pair) {
-    $(pair[0]).addEventListener('click', function () {
-      tabs.forEach(function (other) {
-        var on = other[0] === pair[0];
-        $(other[0]).setAttribute('aria-selected', on ? 'true' : 'false');
-        $(other[1]).classList.toggle('on', on);
-      });
-    });
-  });
-
-  function escapeHtml(text) {
+  function esc(text) {
     return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  var GLYPH = { pass: 'ok', warn: '!', fail: 'x' };
+  var CLASS = { pass: 'ok', warn: 'warn', fail: 'bad' };
 
-  var MARK = { pass: '✓', warn: '!', fail: '✕' };
-
-  function runLink() {
+  function drawLink() {
     var result = readLink($('url').value);
-    var card = $('url-card');
-    card.classList.add('on');
-
+    var box = $('url-report');
+    box.classList.add('on');
     if (!result.ok) {
-      $('url-headline').textContent = 'Cannot read that';
-      $('url-headline').className = 'headline warn';
-      $('url-sub').textContent = result.reason;
-      $('url-checks').innerHTML = '';
+      $('url-verdict').textContent = 'This cannot be read as an address';
+      $('url-verdict').className = 'verdict warn';
+      $('url-byline').textContent = result.reason;
+      $('url-list').innerHTML = '';
       return;
     }
+    $('url-verdict').textContent = result.headline;
+    $('url-verdict').className = 'verdict ' + CLASS[result.tone];
+    $('url-byline').textContent = 'owned by ' + result.owner + '  ·  ' +
+      result.checks.length + ' questions, ' + result.failed + ' failed, ' + result.warned + ' noted';
 
-    $('url-headline').textContent = result.headline;
-    $('url-headline').className = 'headline ' + result.tone;
-    $('url-sub').innerHTML = 'owner <code>' + escapeHtml(result.owner) + '</code> · ' +
-      result.checks.length + ' questions · ' + result.failed + ' failed, ' + result.warned + ' to check';
-
-    var holder = $('url-checks');
-    holder.innerHTML = '';
-    result.checks.forEach(function (check) {
-      var row = document.createElement('div');
-      row.className = 'check';
-      row.innerHTML = '<div class="mark ' + check.verdict + '">' + MARK[check.verdict] + '</div>' +
-        '<div><div class="q">' + escapeHtml(check.question) + '</div>' +
-        '<div class="a">' + check.answer + '</div></div>';
-      holder.appendChild(row);
-    });
+    $('url-list').innerHTML = result.checks.map(function (check) {
+      return '<div class="q"><dt><span class="g ' + CLASS[check.verdict] + '">' + GLYPH[check.verdict] + '</span>' +
+        esc(check.question) + '</dt><dd>' + check.answer + '</dd></div>';
+    }).join('');
   }
 
-  function runText() {
-    var result = readText($('text').value);
-    var card = $('text-card');
-    card.classList.add('on');
+  var SUPPORT = {
+    doc: 'linked document', named: 'named source', quote: 'direct quote',
+    figures: 'figures only', none: 'nothing offered'
+  };
 
+  function drawText() {
+    var result = readText($('text').value);
+    var box = $('text-report');
+    box.classList.add('on');
     if (!result.ok) {
-      $('text-headline').textContent = 'Nothing to read';
-      $('text-headline').className = 'headline warn';
-      $('text-sub').textContent = result.reason;
+      $('text-verdict').textContent = 'Nothing to read';
+      $('text-verdict').className = 'verdict warn';
+      $('text-byline').textContent = result.reason;
       $('claim-body').innerHTML = '';
-      $('tally').innerHTML = '';
+      $('tally').textContent = '';
       return;
     }
+    $('text-verdict').textContent = result.headline;
+    $('text-verdict').className = 'verdict ' + CLASS[result.tone];
+    $('text-byline').textContent = result.total + ' assertion' + (result.total === 1 ? '' : 's') +
+      ', ' + result.supported + ' with support attached';
 
-    $('text-headline').textContent = result.headline;
-    $('text-headline').className = 'headline ' + result.tone;
-    $('text-sub').textContent = result.total + ' assertion' + (result.total === 1 ? '' : 's') +
-      ' · ' + result.supported + ' with a source attached';
+    $('claim-body').innerHTML = result.claims.length
+      ? result.claims.map(function (claim) {
+          return '<tr><td>' + esc(claim.text) + '</td>' +
+            '<td><span class="ev ' + claim.evidence + '">' + SUPPORT[claim.evidence] + '</span></td></tr>';
+        }).join('')
+      : '<tr><td colspan="2">No sentence here asserts a fact. It reads as opinion.</td></tr>';
 
-    var body = $('claim-body');
-    body.innerHTML = '';
-    if (!result.claims.length) {
-      body.innerHTML = '<tr><td colspan="2" class="empty">No sentence here asserts anything checkable — it reads as opinion or filler.</td></tr>';
-    }
-    result.claims.forEach(function (claim) {
-      var row = document.createElement('tr');
-      row.innerHTML = '<td>' + escapeHtml(claim.text) + '</td>' +
-        '<td><span class="evidence ' + claim.evidence + '">' + EVIDENCE_LABEL[claim.evidence] + '</span></td>';
-      body.appendChild(row);
-    });
-
-    var parts = ['<span>sourced: <b>' + result.supported + '</b></span>',
-                 '<span>unsourced: <b>' + result.counts.none + '</b></span>',
-                 '<span>figures only: <b>' + result.counts.figures + '</b></span>',
-                 '<span>hedged: <b>' + result.hedged + '</b></span>',
-                 '<span>absolutes: <b>' + result.absolutes + '</b></span>'];
-    $('tally').innerHTML = parts.join('');
+    $('tally').innerHTML =
+      'sourced <b>' + result.supported + '</b> &nbsp;·&nbsp; unsourced <b>' + result.counts.none + '</b> &nbsp;·&nbsp; ' +
+      'figures only <b>' + result.counts.figures + '</b> &nbsp;·&nbsp; hedged <b>' + result.hedged + '</b> &nbsp;·&nbsp; ' +
+      'absolutes <b>' + result.absolutes + '</b>';
   }
 
   var LINKS = {
@@ -607,18 +526,14 @@
   document.querySelectorAll('[data-sample]').forEach(function (button) {
     button.addEventListener('click', function () {
       var key = button.getAttribute('data-sample');
-      if (LINKS[key]) { $('url').value = LINKS[key]; runLink(); }
-      if (TEXTS[key]) { $('text').value = TEXTS[key]; runText(); }
+      if (LINKS[key]) { $('url').value = LINKS[key]; drawLink(); }
+      if (TEXTS[key]) { $('text').value = TEXTS[key]; drawText(); }
     });
   });
 
-  $('check-url').addEventListener('click', runLink);
-  $('check-text').addEventListener('click', runText);
-  $('url').addEventListener('keydown', function (event) { if (event.key === 'Enter') runLink(); });
-
   var timer = null;
-  $('url').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(runLink, 260); });
-  $('text').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(runText, 260); });
+  $('url').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(drawLink, 240); });
+  $('text').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(drawText, 240); });
 })();
 </script>
 </body>
