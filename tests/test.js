@@ -9,7 +9,7 @@ const eq = (n, got, want) => { if (JSON.stringify(got) !== JSON.stringify(want))
   fails++; console.log(`FAIL ${n}\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); } };
 const ok = (n, cond, extra) => { if (!cond) { fails++; console.log(`FAIL ${n}${extra ? ' — ' + extra : ''}`); } };
 
-// ---------- ported from DeepShield's documented model ----------
+// ---------- ported from the original project's documented model ----------
 eq('baseline for an unknown site', api.analyseUrl('https://random-unknown-site.com').risk, 27);
 // https gives -8, so 35 - 8 = 27 risk, score 73
 eq('score is 100 minus risk', api.analyseUrl('https://random-unknown-site.com').score, 73);
