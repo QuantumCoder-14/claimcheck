@@ -1,8 +1,10 @@
 # Provenance
 
-ClaimCheck is a JavaScript reimplementation of the scoring model and analyser heuristics from
-an earlier student project, **DeepShield 3.3**. The original author has given written permission
-for that reuse, and for this implementation to be licensed under its own author's name.
+ClaimCheck began from **DeepShield 3.3**, a project written by another student and since handed
+over to this repository's author, who has stopped maintaining it.
 
-The browser implementation, the writing-style signals, the interface and the test suite are
+The scoring model and analyser heuristics — the risk weights and baseline, the brand, TLD and
+shortener lists, the typosquat rule, and the claim-scoring formula — come from that work.
+
+The browser implementation, the writing-style signal set, the interface, and the test suite are
 original to ClaimCheck.
