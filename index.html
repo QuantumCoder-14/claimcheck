@@ -24,64 +24,64 @@
     }
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.68;
+  body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:19px;line-height:1.7;
     -webkit-font-smoothing:antialiased}
-  .sheet{max-width:720px;margin:0 auto;padding:56px 26px 90px}
+  .sheet{max-width:900px;margin:0 auto;padding:72px 34px 110px}
   a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule)}
 
-  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:34px}
-  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-  h1{font-size:34px;font-weight:600;letter-spacing:-.015em;line-height:1.12}
-  .standfirst{color:var(--soft);font-size:16px;margin-top:10px;max-width:56ch}
+  header{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:44px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  h1{font-size:46px;font-weight:600;letter-spacing:-.02em;line-height:1.08}
+  .standfirst{color:var(--soft);font-size:18px;margin-top:14px;max-width:60ch}
 
-  .part{margin:44px 0 0}
-  .part__num{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-  h2{font-size:23px;font-weight:600;letter-spacing:-.01em;margin:6px 0 4px}
-  .hint{color:var(--muted);font-size:14px;margin-bottom:16px}
+  .part{margin:58px 0 0}
+  .part__num{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h2{font-size:31px;font-weight:600;letter-spacing:-.015em;margin:8px 0 6px}
+  .hint{color:var(--muted);font-size:16px;margin-bottom:20px}
 
-  label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  label{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
   input[type=text],textarea{width:100%;background:transparent;color:var(--ink);border:none;
-    border-bottom:1px solid var(--rule);padding:9px 0;font-family:var(--mono);font-size:13.5px;line-height:1.7}
-  textarea{border:1px solid var(--rule);padding:12px;min-height:132px;resize:vertical}
+    border-bottom:1px solid var(--rule);padding:12px 0;font-family:var(--mono);font-size:16px;line-height:1.7}
+  textarea{border:1px solid var(--rule);padding:16px;min-height:170px;resize:vertical;font-size:16px}
   input:focus,textarea:focus{outline:none;border-bottom-color:var(--ink);border-color:var(--ink)}
-  .samples{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-family:var(--mono);font-size:11px}
+  .samples{display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-family:var(--mono);font-size:13px}
   .samples button{appearance:none;background:none;border:none;border-bottom:1px dotted var(--rule);
     color:var(--muted);cursor:pointer;font-family:inherit;font-size:inherit;padding:2px 0}
   .samples button:hover{color:var(--ink);border-bottom-color:var(--ink)}
 
   .report{margin-top:26px;padding-top:20px;border-top:1px solid var(--rule);display:none}
   .report.on{display:block}
-  .verdict{font-size:21px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px}
+  .verdict{font-size:27px;font-weight:600;letter-spacing:-.015em;margin-bottom:6px}
   .verdict.ok{color:var(--ok)}.verdict.warn{color:var(--warn)}.verdict.bad{color:var(--bad)}
-  .byline{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+  .byline{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.03em}
 
   dl{margin:18px 0 0}
-  .q{padding:13px 0;border-bottom:1px solid var(--rule-soft)}
+  .q{padding:18px 0;border-bottom:1px solid var(--rule-soft)}
   .q:last-child{border-bottom:none}
-  .q dt{font-weight:600;font-size:15.5px;display:flex;gap:9px;align-items:baseline}
-  .q dt .g{font-family:var(--mono);font-size:12px;width:14px;flex:none}
+  .q dt{font-weight:600;font-size:18px;display:flex;gap:11px;align-items:baseline}
+  .q dt .g{font-family:var(--mono);font-size:14px;width:18px;flex:none}
   .q dt .g.ok{color:var(--ok)}.q dt .g.warn{color:var(--warn)}.q dt .g.bad{color:var(--bad)}
-  .q dd{color:var(--soft);font-size:14.5px;margin:4px 0 0 23px;line-height:1.6}
-  .q dd code{font-family:var(--mono);font-size:12.5px;background:var(--rule-soft);padding:1px 4px}
+  .q dd{color:var(--soft);font-size:16.5px;margin:6px 0 0 29px;line-height:1.65}
+  .q dd code{font-family:var(--mono);font-size:14px;background:var(--rule-soft);padding:1px 4px}
 
-  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  table{width:100%;border-collapse:collapse;margin-top:22px;font-size:16.5px}
+  th{text-align:left;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--muted);font-weight:400;padding:0 0 8px;border-bottom:1px solid var(--ink)}
-  td{padding:11px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--soft)}
+  td{padding:15px 0;border-bottom:1px solid var(--rule-soft);vertical-align:top;color:var(--soft);line-height:1.6}
   td:first-child{color:var(--ink);padding-right:18px}
-  td:last-child{text-align:right;white-space:nowrap;font-family:var(--mono);font-size:11px}
+  td:last-child{text-align:right;white-space:nowrap;font-family:var(--mono);font-size:12.5px}
   .ev{letter-spacing:.04em}
   .ev.doc,.ev.named{color:var(--ok)}
   .ev.quote{color:var(--soft)}
   .ev.figures{color:var(--warn)}
   .ev.none{color:var(--bad)}
-  .tally{margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2}
+  .tally{margin-top:20px;font-family:var(--mono);font-size:13px;color:var(--muted);line-height:2.1}
   .tally b{color:var(--ink);font-weight:500}
 
-  .colophon{margin-top:56px;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--mono);
-    font-size:11px;color:var(--muted);line-height:1.9}
+  .colophon{margin-top:64px;padding-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);
+    font-size:12.5px;color:var(--muted);line-height:1.9}
   .colophon a{border-bottom:1px dotted var(--rule)}
-  .caveat{color:var(--soft);font-size:14px;font-style:italic;margin-top:14px;max-width:60ch}
+  .caveat{color:var(--soft);font-size:16px;font-style:italic;margin-top:16px;max-width:62ch}
 </style>
 </head>
 <body>
